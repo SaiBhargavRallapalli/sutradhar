@@ -1,0 +1,19 @@
+# Render Blueprint for Sutradhar — one-click deploy.
+# Dashboard: New + -> Blueprint -> select this repo. Render does the rest.
+services:
+  - type: web
+    name: sutradhar
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    # $PORT is injected by Render; 0.0.0.0 is required (localhost is unreachable).
+    startCommand: PYTHONPATH=src python3 -m sutradhar.cli web --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    # Optional live-model prose. Without keys the app runs fully offline.
+    envVars:
+      - key: SUTRADHAR_PROVIDER
+        value: auto
+      - key: SUTRADHAR_OPENAI_API_KEY
+        sync: false
+      - key: SUTRADHAR_GEMINI_API_KEY
+        sync: false
