@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
+from typing import Any
 
 import pytest
 
@@ -36,8 +37,9 @@ class QueueProvider(Provider):
         *,
         temperature: float = 0.7,
         timeout: float = 45.0,
+        response_schema: dict[str, Any] | None = None,
     ) -> str:
-        del system, temperature, timeout
+        del system, temperature, timeout, response_schema
         self.prompts.append(user)
         outcome = self.outcomes[min(self.calls, len(self.outcomes) - 1)]
         self.calls += 1
@@ -80,6 +82,8 @@ def test_parse_ideas_validates_and_sanitizes() -> None:
     ideas = parse_ideas(VALID_IDEAS)
     assert [idea.key for idea in ideas] == ["courtyard-supper", "garden-morning"]
     assert ideas[0].estimated_delta_pct == 1.5
+    wrapped = parse_ideas(json.dumps({"concepts": json.loads(VALID_IDEAS)}))
+    assert [idea.key for idea in wrapped] == ["courtyard-supper", "garden-morning"]
 
 
 @pytest.mark.parametrize("raw", ["{}", "[]", '[{"name": "missing tagline"}]'])

@@ -10,6 +10,7 @@ from email.message import Message
 import pytest
 
 from sutradhar.ai import provider as provider_module
+from sutradhar.ai.ideas import IDEAS_RESPONSE_SCHEMA
 from sutradhar.ai.provider import GeminiProvider, OpenAICompatProvider, resolve_provider
 from sutradhar.config import Settings
 from sutradhar.exceptions import AIProviderError
@@ -111,14 +112,24 @@ def test_post_json_reports_network_and_json_failures(monkeypatch) -> None:
 
 
 def test_openai_and_gemini_extract_text(monkeypatch) -> None:
-    monkeypatch.setattr(
-        provider_module,
-        "_post_json",
-        lambda *_args, **_kwargs: {"choices": [{"message": {"content": "openai"}}]},
-    )
+    payloads: list[dict[str, object]] = []
+
+    def openai_response(_url, payload, _headers, *, timeout):
+        del timeout
+        payloads.append(payload)
+        return {"choices": [{"message": {"content": "openai"}}]}
+
+    monkeypatch.setattr(provider_module, "_post_json", openai_response)
     openai = OpenAICompatProvider("secret", "https://groq.example/v1", "model-a")
     assert openai.complete("system", "user") == "openai"
     assert openai.model == "model-a"
+
+    groq = OpenAICompatProvider("secret", "https://api.groq.com/openai/v1", "openai/gpt-oss-20b")
+    assert groq.complete("system", "user", response_schema=IDEAS_RESPONSE_SCHEMA) == "openai"
+    structured = payloads[-1]
+    assert structured["reasoning_effort"] == "low"
+    assert structured["max_completion_tokens"] == 3_000
+    assert structured["response_format"]["json_schema"]["strict"] is True
 
     monkeypatch.setattr(
         provider_module,

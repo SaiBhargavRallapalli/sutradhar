@@ -186,6 +186,11 @@ An interface can therefore say *"ideas came from a language model"* and *"the
 budget came from the allocator"* honestly, and a user knows which parts to
 scrutinise.
 
+When the configured endpoint is Groq GPT-OSS, the provider requests strict
+constrained JSON Schema output with low reasoning effort. That improves
+reliability and latency but does not bypass local extraction, validation,
+sanitisation, budget grounding or catalogue fallback.
+
 ### Graceful degradation is total
 
 There is no state in which Sutradhar returns *nothing*. Every failure path ends
@@ -338,17 +343,17 @@ asset budget and the challenge repository-size budget.
 
 | Path | Lines | Responsibility |
 |---|---:|---|
-| `models.py` | ~700 | the domain contract |
-| `catalog/*.py` | ~2,100 | five verticals, schema, registry |
-| `engines/*.py` | ~1,400 | budget, timeline, vendors, risk, personalisation |
-| `ai/*.py` | ~1,100 | guardrails, schema, providers, prompts, ideas, brief |
-| `cli.py` | ~450 | the command line |
-| `export.py` | ~430 | Markdown, CSV ×3, ICS |
-| `server/*.py` | ~500 | WSGI routes, security, limits, static delivery |
-| `money.py` | ~206 | integer minor units + formatting |
-| `inputs.py` | ~250 | dict/JSON → validated Brief |
-| `pipeline.py` | ~138 | orchestration |
-| `web/*` | ~1,180 | accessible zero-build UI |
+| `models.py` | ~506 | the domain contract |
+| `catalog/*.py` | ~4,443 | five declarative verticals, schema, registry |
+| `engines/*.py` | ~1,540 | budget, timeline, vendors, risk, personalisation |
+| `ai/*.py` | ~1,575 | guardrails, schema, providers, prompts, ideas, resilience |
+| `cli.py` | ~527 | the command line |
+| `export.py` | ~479 | Markdown, CSV ×3, ICS |
+| `server/*.py` | ~686 | WSGI routes, security, limits, static delivery |
+| `money.py` | ~209 | integer minor units + formatting |
+| `inputs.py` | ~191 | dict/JSON → validated Brief |
+| `pipeline.py` | ~139 | orchestration |
+| `web/*` | ~1,188 | accessible zero-build UI |
 
 ---
 
@@ -382,8 +387,8 @@ or reassure genuinely impossible two-week ones. Both numbers are reported, with
 different jobs. See [`ALGORITHMS.md`](ALGORITHMS.md#timeline).
 
 **Why a bespoke JSON validator instead of a library?**
-A schema validator is ~150 lines. A dependency would violate the zero-dep
-promise to save 150 readable lines — and the custom one can do things a generic
-one cannot: extract JSON out of a model's chatty prose, list *every* problem in
-one pass so a single repair round can fix all of them, and cap every string and
-list length at the boundary.
+The planning core and provider transports remain standard-library-only; Waitress
+is reserved for production HTTP mechanics. The small validator also does
+domain-specific work a generic package would not: it extracts JSON out of
+chatty prose, lists *every* problem in one pass so a single repair round can fix
+all of them, and caps every string and list length at the boundary.

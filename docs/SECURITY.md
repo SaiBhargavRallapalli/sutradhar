@@ -80,6 +80,8 @@ Controls:
 
 - injection-shaped host instructions are refused before prompting;
 - prompt and response sizes are bounded;
+- Groq GPT-OSS uses strict constrained JSON Schema output, followed by the same
+  provider-independent local validation and sanitisation as every model;
 - one total 40-second budget covers the initial and repair calls;
 - transport performs at most one retry within that same deadline;
 - successful identical calls use a 128-entry, six-hour LRU/TTL cache;

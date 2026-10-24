@@ -8,12 +8,14 @@ The wrapper never stores raw prompts as keys and never caches failures.
 from __future__ import annotations
 
 import hashlib
+import json
 import threading
 import time
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import Any
 
 from ..exceptions import AIProviderError
 from .provider import Provider
@@ -95,8 +97,9 @@ class ResilientProvider(Provider):
         *,
         temperature: float = 0.7,
         timeout: float = 45.0,
+        response_schema: dict[str, Any] | None = None,
     ) -> str:
-        key = self._key(system, user, temperature)
+        key = self._key(system, user, temperature, response_schema)
         pending, leader = self._admit(key)
         if not leader:
             if not pending.event.wait(timeout=max(1.0, timeout + 1.0)):
@@ -113,6 +116,7 @@ class ResilientProvider(Provider):
                 user,
                 temperature=temperature,
                 timeout=timeout,
+                response_schema=response_schema,
             )
         except AIProviderError as exc:
             self._finish_failure(key, pending, exc)
@@ -134,8 +138,15 @@ class ResilientProvider(Provider):
                 cache_entries=len(self._cache),
             )
 
-    def _key(self, system: str, user: str, temperature: float) -> str:
-        material = "\0".join((self.name, self.model, f"{temperature:.4f}", system, user))
+    def _key(
+        self,
+        system: str,
+        user: str,
+        temperature: float,
+        response_schema: dict[str, Any] | None,
+    ) -> str:
+        schema = json.dumps(response_schema, sort_keys=True, separators=(",", ":"))
+        material = "\0".join((self.name, self.model, f"{temperature:.4f}", schema, system, user))
         return hashlib.sha256(material.encode("utf-8")).hexdigest()
 
     def _admit(self, key: str) -> tuple[_Pending, bool]:

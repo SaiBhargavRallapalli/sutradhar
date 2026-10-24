@@ -6,6 +6,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
+from typing import Any
 
 import pytest
 
@@ -35,8 +36,9 @@ class RecordingProvider(Provider):
         *,
         temperature: float = 0.7,
         timeout: float = 45.0,
+        response_schema: dict[str, Any] | None = None,
     ) -> str:
-        del system, user, temperature, timeout
+        del system, user, temperature, timeout, response_schema
         with self.lock:
             index = self.calls
             self.calls += 1

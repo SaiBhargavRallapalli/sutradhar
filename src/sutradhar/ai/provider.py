@@ -13,8 +13,8 @@ ways plus a fail-fast stub:
   entire test-suite and the demo run with no network and no credentials.
 * :class:`NullProvider` fails loudly and explains how to configure a real one.
 
-Transport is :mod:`urllib` from the standard library - keeping the "zero
-runtime dependencies" promise holds at the network layer too.
+Transport is :mod:`urllib` from the standard library, so the provider layer
+does not add another runtime dependency.
 """
 
 from __future__ import annotations
@@ -64,7 +64,13 @@ class Provider(ABC):
 
     @abstractmethod
     def complete(
-        self, system: str, user: str, *, temperature: float = 0.7, timeout: float = 45.0
+        self,
+        system: str,
+        user: str,
+        *,
+        temperature: float = 0.7,
+        timeout: float = 45.0,
+        response_schema: dict[str, Any] | None = None,
     ) -> str:
         """Return the model's raw text response for one prompt pair."""
 
@@ -169,7 +175,13 @@ class OpenAICompatProvider(Provider):
         return self._model
 
     def complete(
-        self, system: str, user: str, *, temperature: float = 0.7, timeout: float = 45.0
+        self,
+        system: str,
+        user: str,
+        *,
+        temperature: float = 0.7,
+        timeout: float = 45.0,
+        response_schema: dict[str, Any] | None = None,
     ) -> str:
         payload = {
             "model": self._model,
@@ -180,6 +192,30 @@ class OpenAICompatProvider(Provider):
             "temperature": temperature,
             "max_tokens": 1_400,
         }
+        if (
+            response_schema is not None
+            and self._base_url.startswith("https://api.groq.com/openai/")
+            and self._model in {"openai/gpt-oss-20b", "openai/gpt-oss-120b"}
+        ):
+            # Groq guarantees this schema for GPT-OSS through constrained
+            # decoding. Low reasoning leaves the completion budget for the
+            # user-visible concepts rather than hidden chain-of-thought.
+            payload.pop("max_tokens")
+            payload.update(
+                {
+                    "max_completion_tokens": 3_000,
+                    "reasoning_effort": "low",
+                    "include_reasoning": False,
+                    "response_format": {
+                        "type": "json_schema",
+                        "json_schema": {
+                            "name": "sutradhar_response",
+                            "strict": True,
+                            "schema": response_schema,
+                        },
+                    },
+                }
+            )
         data = _post_json(
             f"{self._base_url}/chat/completions",
             payload,
@@ -214,8 +250,15 @@ class GeminiProvider(Provider):
         return self._model
 
     def complete(
-        self, system: str, user: str, *, temperature: float = 0.7, timeout: float = 45.0
+        self,
+        system: str,
+        user: str,
+        *,
+        temperature: float = 0.7,
+        timeout: float = 45.0,
+        response_schema: dict[str, Any] | None = None,
     ) -> str:
+        del response_schema
         payload = {
             "systemInstruction": {"parts": [{"text": system}]},
             "contents": [{"role": "user", "parts": [{"text": user}]}],
@@ -284,8 +327,15 @@ class MockProvider(Provider):
     )
 
     def complete(
-        self, system: str, user: str, *, temperature: float = 0.7, timeout: float = 45.0
+        self,
+        system: str,
+        user: str,
+        *,
+        temperature: float = 0.7,
+        timeout: float = 45.0,
+        response_schema: dict[str, Any] | None = None,
     ) -> str:
+        del response_schema
         return self._RESPONSE
 
 
@@ -296,8 +346,15 @@ class NullProvider(Provider):
     is_live = False
 
     def complete(
-        self, system: str, user: str, *, temperature: float = 0.7, timeout: float = 45.0
+        self,
+        system: str,
+        user: str,
+        *,
+        temperature: float = 0.7,
+        timeout: float = 45.0,
+        response_schema: dict[str, Any] | None = None,
     ) -> str:
+        del response_schema
         raise AIConfigError(
             "no language-model provider is configured. Set SUTRADHAR_OPENAI_API_KEY or "
             "SUTRADHAR_GEMINI_API_KEY (see .env.example), or run with the catalogue-only "

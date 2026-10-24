@@ -15,6 +15,7 @@ from __future__ import annotations
 import re
 import time
 from dataclasses import dataclass
+from typing import Any
 
 from ..catalog.specs import EventTypeProfile
 from ..config import Settings
@@ -27,7 +28,13 @@ from .prompts import IDEAS_SYSTEM, build_ideas_user, build_repair_user
 from .provider import Provider
 from .schema import FieldSpec, ObjectSpec, extract_json, validate_object
 
-__all__ = ["IDEAS_SPEC", "IdeaResult", "generate_ideas", "parse_ideas"]
+__all__ = [
+    "IDEAS_RESPONSE_SCHEMA",
+    "IDEAS_SPEC",
+    "IdeaResult",
+    "generate_ideas",
+    "parse_ideas",
+]
 
 
 #: The exact shape the system prompt promises. Kept beside the prompt so the
@@ -46,6 +53,47 @@ IDEAS_SPEC = ObjectSpec(
         FieldSpec("estimated_delta_pct", ("float",), required=False, default=0.0),
     )
 )
+
+# Strict JSON Schema used by providers that support constrained decoding.
+# Every field is required because that is a Groq strict-mode requirement.
+IDEAS_RESPONSE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "concepts": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "tagline": {"type": "string"},
+                    "palette": {"type": "array", "items": {"type": "string"}},
+                    "decor": {"type": "string"},
+                    "menu": {"type": "string"},
+                    "favors": {"type": "string"},
+                    "attire": {"type": "string"},
+                    "music": {"type": "string"},
+                    "activities": {"type": "string"},
+                    "estimated_delta_pct": {"type": "number"},
+                },
+                "required": [
+                    "name",
+                    "tagline",
+                    "palette",
+                    "decor",
+                    "menu",
+                    "favors",
+                    "attire",
+                    "music",
+                    "activities",
+                    "estimated_delta_pct",
+                ],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["concepts"],
+    "additionalProperties": False,
+}
 
 #: Never let the model return an unbounded list, whatever it decides to do.
 _MAX_CONCEPTS = 3
@@ -78,6 +126,8 @@ def parse_ideas(text: str) -> list[IdeaConcept]:
     problem, so a single repair round can address all of them at once.
     """
     payload = extract_json(text)
+    if isinstance(payload, dict) and "concepts" in payload:
+        payload = payload["concepts"]
     if not isinstance(payload, list):
         raise AISchemaError(
             f"expected a JSON array of concepts, got {type(payload).__name__}", raw=text
@@ -193,7 +243,13 @@ def generate_ideas(
         prompt = user_prompt if attempt == 0 else build_repair_user(user_prompt, raw, errors)
 
         try:
-            raw = provider.complete(IDEAS_SYSTEM, prompt, temperature=0.7, timeout=remaining)
+            raw = provider.complete(
+                IDEAS_SYSTEM,
+                prompt,
+                temperature=0.7,
+                timeout=remaining,
+                response_schema=IDEAS_RESPONSE_SCHEMA,
+            )
         except AIProviderError as exc:
             warnings.append(
                 PlanWarning(

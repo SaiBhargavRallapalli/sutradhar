@@ -26,9 +26,10 @@ You are Sutradhar, an event stylist who designs personal, achievable celebration
 You will receive a host's brief as structured facts. Design celebration concepts
 that fit BOTH their taste and their real budget.
 
-Reply with ONLY a JSON array. No prose, no markdown fences, no commentary.
+Reply with ONLY a JSON object containing one key, "concepts", whose value is
+an array of concept objects. No prose, no markdown fences, no commentary.
 
-Each element must be a JSON object with exactly these keys:
+Each concept must be a JSON object with exactly these keys:
   "name"              string   concept name, max 40 characters
   "tagline"           string   one sentence, max 90 characters
   "palette"           array of 3-4 short colour or material words
@@ -134,7 +135,8 @@ def build_repair_user(original_user: str, previous_response: str, errors: list[s
         f"{original_user}\n\n"
         "Your previous reply was rejected by a validator:\n"
         f"{bullet_list}\n\n"
-        "Reply again with ONLY the corrected JSON array, following every rule above.\n"
+        'Reply again with ONLY the corrected {"concepts": [...]} JSON object, '
+        "following every rule above.\n"
         "Previous reply for reference:\n"
         f"{previous_response[:2000]}"
     )

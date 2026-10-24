@@ -78,6 +78,9 @@ back to the offline catalogue), `openai`, `gemini`, or `mock`. The
 OpenAI-compatible adapter speaks `POST /chat/completions`, so it also works with
 Groq, Together, OpenRouter, Mistral, LM Studio, llama.cpp, vLLM and Ollama's
 `/v1` endpoint — one implementation, many backends.
+For the deployed Groq GPT-OSS model, the adapter enables strict constrained
+JSON Schema output with low reasoning effort; local validation and grounding
+still run before any model text reaches a plan.
 
 ---
 
