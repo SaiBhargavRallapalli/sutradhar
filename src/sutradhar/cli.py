@@ -499,7 +499,9 @@ def build_parser() -> argparse.ArgumentParser:
     web.add_argument("--host", default="127.0.0.1")
     web.add_argument("--port", type=int, default=8787)
     web.add_argument(
-        "--web-root", default=str(Path(__file__).resolve().parent.parent.parent / "web")
+        "--web-root",
+        default=None,
+        help="static UI directory (default: discover web/ from the process or source tree)",
     )
     web.add_argument("--no-color", action="store_true")
     web.set_defaults(func=cmd_web)

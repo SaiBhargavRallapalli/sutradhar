@@ -109,7 +109,7 @@ def test_plain_text_brief_success_path(monkeypatch, capsys) -> None:
 def test_web_delegates_to_production_server(monkeypatch) -> None:
     called: dict[str, object] = {}
 
-    def fake_serve(*, host: str, port: int, web_root: str) -> int:
+    def fake_serve(*, host: str, port: int, web_root: str | None) -> int:
         called.update(host=host, port=port, web_root=web_root)
         return 0
 
@@ -117,6 +117,7 @@ def test_web_delegates_to_production_server(monkeypatch) -> None:
     assert cli.main(["web", "--host", "0.0.0.0", "--port", "9999"]) == 0
     assert called["host"] == "0.0.0.0"
     assert called["port"] == 9999
+    assert called["web_root"] is None
 
 
 def test_missing_and_invalid_brief_files_are_actionable(tmp_path, capsys) -> None:
