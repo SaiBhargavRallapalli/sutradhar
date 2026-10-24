@@ -134,11 +134,11 @@ jobs:
             if curl -fsS http://127.0.0.1:8787/api/health >/dev/null 2>&1; then break; fi
             sleep 1
           done
-          curl -fsS http://127.0.0.1:8787/api/health | grep -q '"ok": true'
+          curl -fsS http://127.0.0.1:8787/api/health | grep -Eq '"ok":[[:space:]]*true'
           curl -fsS -X POST http://127.0.0.1:8787/api/plan \
             -H 'Content-Type: application/json' \
             -d '{"event_type":"wedding","event_date":"2027-06-06","guest_count":150,"budget":"800000","currency":"INR"}' \
-            | grep -q '"ok": true'
+            | grep -Eq '"ok":[[:space:]]*true'
           echo "server smoke test passed"
 
       - name: Check the web UI is served with security headers
