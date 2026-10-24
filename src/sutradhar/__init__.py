@@ -13,16 +13,17 @@ The split is deliberate and is the core architectural idea:
 * Everything the model returns is validated against a schema and grounded
   against the engine's numbers before it reaches you.
 
-The package has **zero runtime dependencies** - it runs on the Python standard
-library alone, offline, with no API key.
+The planning core uses only the Python standard library and works offline
+without an API key. The web command adds one pinned production-server
+dependency: Waitress.
 """
 
 from __future__ import annotations
 
 from .enums import CityTier, EventType, Priority, RiskLevel, Season, WindExposure
 from .models import (
-    BudgetPlan,
     Brief,
+    BudgetPlan,
     IdeaConcept,
     Plan,
     RiskPlan,
@@ -36,22 +37,22 @@ from .pipeline import Planner, plan_event
 __version__ = "1.0.0"
 
 __all__ = [
-    "__version__",
-    "EventType",
+    "Brief",
+    "BudgetPlan",
     "CityTier",
+    "Currency",
+    "EventType",
+    "IdeaConcept",
+    "Plan",
+    "Planner",
     "Priority",
     "RiskLevel",
+    "RiskPlan",
     "Season",
-    "WindExposure",
-    "Currency",
     "TasteProfile",
-    "Brief",
-    "Plan",
-    "BudgetPlan",
     "TimelinePlan",
     "VendorPlan",
-    "RiskPlan",
-    "IdeaConcept",
-    "Planner",
+    "WindExposure",
+    "__version__",
     "plan_event",
 ]

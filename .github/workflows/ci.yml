@@ -21,8 +21,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macOS and Windows as well as Linux: the project is standard-library
-        # only, so portability is a claim worth testing rather than asserting.
+        # The planning core is portable; verify all supported interpreters and
+        # operating systems instead of merely asserting compatibility.
         os: [ubuntu-latest]
         python-version: ["3.10", "3.11", "3.12"]
         include:
@@ -32,23 +32,25 @@ jobs:
             python-version: "3.12"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
       - name: Install dev tooling
-        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
 
       - name: Run tests
         run: python -m pytest --cov=sutradhar --cov-report=term-missing --cov-report=xml
 
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: coverage
           path: coverage.xml
@@ -57,16 +59,18 @@ jobs:
     name: lint & typecheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
           cache: pip
 
       - name: Install dev tooling
-        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
 
       - name: Ruff (lint)
         run: python -m ruff check src tests
@@ -82,18 +86,20 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test, lint]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
           cache: pip
 
       - name: Install
-        run: python -m pip install --upgrade pip && python -m pip install -e .
+        run: python -m pip install --disable-pip-version-check -e .
 
-      # No API key, no network: this proves the zero-dependency, offline claim.
+      # No API key or network: this proves the offline planning claim.
       - name: Generate a demo plan
         run: python -m sutradhar.cli demo --no-color --offline --out out
 
@@ -161,7 +167,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Enforce the <10 MB repository budget
         shell: bash
@@ -174,3 +182,18 @@ jobs:
             echo "Repository is ${SIZE} KB, over the 8 MB soft budget."
             exit 1
           fi
+          ASSETS=$(du -ck web/* | awk '/total$/ {print $1}')
+          echo "web assets: ${ASSETS} KB"
+          test "$ASSETS" -le 50 || { echo "Web assets exceed the 50 KB budget."; exit 1; }
+
+  secrets:
+    name: no secrets in git history
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Scan complete history with Gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2

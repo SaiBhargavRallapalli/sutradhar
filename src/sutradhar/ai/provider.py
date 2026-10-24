@@ -24,27 +24,27 @@ import time
 import urllib.error
 import urllib.request
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar
+from typing import Any, cast
 
 from ..config import Settings
 from ..exceptions import AIConfigError, AIProviderError
 from .guardrails import redact
 
 __all__ = [
-    "Provider",
-    "OpenAICompatProvider",
+    "USER_AGENT",
     "GeminiProvider",
     "MockProvider",
     "NullProvider",
+    "OpenAICompatProvider",
+    "Provider",
     "resolve_provider",
-    "USER_AGENT",
 ]
 
 USER_AGENT = "sutradhar/1.0 (+event-planner)"
 
 #: Status codes worth retrying: rate limits and transient server errors.
 _RETRYABLE_STATUS = frozenset({408, 429, 500, 502, 503, 504})
-_MAX_ATTEMPTS = 3
+_MAX_ATTEMPTS = 2
 _BACKOFF_SECONDS = 0.4
 
 
@@ -52,10 +52,10 @@ class Provider(ABC):
     """Minimal contract every language-model backend satisfies."""
 
     #: Short identifier recorded in plan provenance.
-    name: ClassVar[str] = "provider"
+    name: str = "provider"
 
     #: ``False`` for offline stubs, so callers know to prefer the catalogue.
-    is_live: ClassVar[bool] = False
+    is_live: bool = False
 
     @property
     def model(self) -> str:
@@ -63,7 +63,9 @@ class Provider(ABC):
         return "unconfigured"
 
     @abstractmethod
-    def complete(self, system: str, user: str, *, temperature: float = 0.7, timeout: float = 45.0) -> str:
+    def complete(
+        self, system: str, user: str, *, temperature: float = 0.7, timeout: float = 45.0
+    ) -> str:
         """Return the model's raw text response for one prompt pair."""
 
     def is_configured(self) -> bool:
@@ -86,36 +88,55 @@ def _post_json(
     body = json.dumps(payload).encode("utf-8")
     request_headers = {"Content-Type": "application/json", "User-Agent": USER_AGENT, **headers}
     last_error = "unknown error"
+    deadline = time.monotonic() + timeout
 
     for attempt in range(_MAX_ATTEMPTS):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise AIProviderError("the model request exceeded its total time budget")
         request = urllib.request.Request(url, data=body, headers=request_headers, method="POST")
         try:
-            with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 - fixed schemes
+            with urllib.request.urlopen(request, timeout=remaining) as response:
                 charset = response.headers.get_content_charset() or "utf-8"
-                return json.loads(response.read().decode(charset))
+                parsed = json.loads(response.read().decode(charset))
+                if not isinstance(parsed, dict):
+                    raise AIProviderError("the model endpoint returned a non-object response")
+                return cast(dict[str, Any], parsed)
         except urllib.error.HTTPError as exc:
             detail = _read_error(exc)
             if exc.code in _RETRYABLE_STATUS and attempt < _MAX_ATTEMPTS - 1:
                 last_error = f"HTTP {exc.code}: {detail}"
-                time.sleep(_BACKOFF_SECONDS * (2**attempt))
+                _sleep_within(deadline, _BACKOFF_SECONDS * (2**attempt))
                 continue
-            raise AIProviderError(redact(f"model request failed with HTTP {exc.code}: {detail}")) from exc
+            raise AIProviderError(
+                redact(f"model request failed with HTTP {exc.code}: {detail}")
+            ) from exc
         except urllib.error.URLError as exc:
             last_error = f"network error: {exc.reason}"
             if attempt < _MAX_ATTEMPTS - 1:
-                time.sleep(_BACKOFF_SECONDS * (2**attempt))
+                _sleep_within(deadline, _BACKOFF_SECONDS * (2**attempt))
                 continue
-            raise AIProviderError(redact(f"could not reach the model endpoint: {exc.reason}")) from exc
+            raise AIProviderError(
+                redact(f"could not reach the model endpoint: {exc.reason}")
+            ) from exc
         except TimeoutError as exc:
             last_error = "request timed out"
             if attempt < _MAX_ATTEMPTS - 1:
-                time.sleep(_BACKOFF_SECONDS * (2**attempt))
+                _sleep_within(deadline, _BACKOFF_SECONDS * (2**attempt))
                 continue
             raise AIProviderError("the model request timed out") from exc
         except json.JSONDecodeError as exc:
             raise AIProviderError("the model endpoint returned a non-JSON response") from exc
 
     raise AIProviderError(redact(f"model request failed: {last_error}"))
+
+
+def _sleep_within(deadline: float, delay: float) -> None:
+    """Back off without allowing retries to exceed the caller's total budget."""
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise AIProviderError("the model request exceeded its total time budget")
+    time.sleep(min(delay, remaining))
 
 
 def _read_error(exc: urllib.error.HTTPError) -> str:
@@ -168,7 +189,9 @@ class OpenAICompatProvider(Provider):
         try:
             content = data["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
-            raise AIProviderError("the model response was missing choices[0].message.content") from exc
+            raise AIProviderError(
+                "the model response was missing choices[0].message.content"
+            ) from exc
         if not isinstance(content, str):
             raise AIProviderError("the model returned a non-text response")
         return content
@@ -212,7 +235,9 @@ class GeminiProvider(Provider):
             parts = data["candidates"][0]["content"]["parts"]
             text = "".join(part.get("text", "") for part in parts if isinstance(part, dict))
         except (KeyError, IndexError, TypeError) as exc:
-            raise AIProviderError("the Gemini response was missing candidates[0].content.parts") from exc
+            raise AIProviderError(
+                "the Gemini response was missing candidates[0].content.parts"
+            ) from exc
         if not text:
             raise AIProviderError("Gemini returned no text (possibly filtered or empty)")
         return text
@@ -293,13 +318,17 @@ def resolve_provider(settings: Settings) -> Provider:
         return MockProvider()
     if choice == "openai":
         return (
-            OpenAICompatProvider(settings.openai_api_key, settings.openai_base_url, settings.openai_model)
+            OpenAICompatProvider(
+                settings.openai_api_key or "",
+                settings.openai_base_url,
+                settings.openai_model,
+            )
             if settings.has_openai
             else NullProvider()
         )
     if choice == "gemini":
         return (
-            GeminiProvider(settings.gemini_api_key, settings.gemini_model)
+            GeminiProvider(settings.gemini_api_key or "", settings.gemini_model)
             if settings.has_gemini
             else NullProvider()
         )

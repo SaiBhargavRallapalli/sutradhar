@@ -4,6 +4,7 @@ Money is the one place where a small bug has real consequences, so these tests
 are deliberately fussy: exact integer arithmetic, correct Indian grouping, and
 parsing that is forgiving about how humans actually type amounts.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -16,13 +17,22 @@ class TestCurrencyParsing:
     def test_parses_code_and_symbol(self, value: str) -> None:
         assert Currency.parse(value) is Currency.INR
 
-    @pytest.mark.parametrize("raw,expected", [
-        ("USD", Currency.USD), ("usd", Currency.USD), ("$", Currency.USD),
-        ("EUR", Currency.EUR), ("€", Currency.EUR),
-        ("GBP", Currency.GBP), ("£", Currency.GBP),
-        ("JPY", Currency.JPY), ("¥", Currency.JPY),
-        ("SGD", Currency.SGD), ("S$", Currency.SGD),
-    ])
+    @pytest.mark.parametrize(
+        "raw,expected",
+        [
+            ("USD", Currency.USD),
+            ("usd", Currency.USD),
+            ("$", Currency.USD),
+            ("EUR", Currency.EUR),
+            ("€", Currency.EUR),
+            ("GBP", Currency.GBP),
+            ("£", Currency.GBP),
+            ("JPY", Currency.JPY),
+            ("¥", Currency.JPY),
+            ("SGD", Currency.SGD),
+            ("S$", Currency.SGD),
+        ],
+    )
     def test_parses_every_supported_currency(self, raw: str, expected: Currency) -> None:
         assert Currency.parse(raw) is expected
 
@@ -93,15 +103,18 @@ class TestFormatting:
 
 
 class TestParsing:
-    @pytest.mark.parametrize("text,expected", [
-        ("1500000", 150000000),
-        ("₹15,00,000", 150000000),
-        ("15 lakh", 150000000),
-        ("15L", 150000000),
-        ("1.5 crore", 1500000000),
-        ("250000", 25000000),
-        ("12.5k", 1250000),
-    ])
+    @pytest.mark.parametrize(
+        "text,expected",
+        [
+            ("1500000", 150000000),
+            ("₹15,00,000", 150000000),
+            ("15 lakh", 150000000),
+            ("15L", 150000000),
+            ("1.5 crore", 1500000000),
+            ("250000", 25000000),
+            ("12.5k", 1250000),
+        ],
+    )
     def test_parses_how_humans_type_money(self, text: str, expected: int) -> None:
         assert parse_amount(text, Currency.INR) == expected
 
@@ -145,10 +158,14 @@ class TestNoFloatDrift:
     def test_column_of_amounts_still_adds_up(self) -> None:
         """The bug this architecture exists to prevent: a budget column that
         does not reconcile because of float rounding."""
-        amounts = [to_minor(x, Currency.INR) for x in
-                   ("4194.24", "2572.70", "1483.08", "1295.08", "1117.93")]
+        amounts = [
+            to_minor(x, Currency.INR)
+            for x in ("4194.24", "2572.70", "1483.08", "1295.08", "1117.93")
+        ]
         assert sum(amounts) == 419424 + 257270 + 148308 + 129508 + 111793
 
     def test_integer_addition_is_exact_where_floats_are_not(self) -> None:
         # 0.1 + 0.2 != 0.3 in binary floating point; in minor units it does.
-        assert to_minor("0.1", Currency.USD) + to_minor("0.2", Currency.USD) == to_minor("0.3", Currency.USD)
+        assert to_minor("0.1", Currency.USD) + to_minor("0.2", Currency.USD) == to_minor(
+            "0.3", Currency.USD
+        )

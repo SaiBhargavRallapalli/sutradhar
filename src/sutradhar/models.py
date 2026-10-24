@@ -31,22 +31,22 @@ from .money import Currency
 from .serialise import dumps, with_computed
 
 __all__ = [
-    "TasteProfile",
     "Brief",
-    "PlanWarning",
     "BudgetLine",
-    "TradeOff",
     "BudgetPlan",
-    "Task",
-    "RunOfShowSlot",
-    "TimelinePlan",
-    "VendorItem",
+    "IdeaConcept",
     "PaymentMilestone",
-    "VendorPlan",
+    "Plan",
+    "PlanWarning",
     "RiskItem",
     "RiskPlan",
-    "IdeaConcept",
-    "Plan",
+    "RunOfShowSlot",
+    "Task",
+    "TasteProfile",
+    "TimelinePlan",
+    "TradeOff",
+    "VendorItem",
+    "VendorPlan",
 ]
 
 # Hard guards so a hostile or typo'd input can never allocate absurd work.
@@ -82,8 +82,16 @@ class TasteProfile:
     @property
     def is_empty(self) -> bool:
         return not any(
-            (self.palette, self.style_keywords, self.traditions, self.vibe,
-             self.dietary, self.accessibility_notes, self.must_haves, self.avoid)
+            (
+                self.palette,
+                self.style_keywords,
+                self.traditions,
+                self.vibe,
+                self.dietary,
+                self.accessibility_notes,
+                self.must_haves,
+                self.avoid,
+            )
         )
 
     def signal_tokens(self) -> set[str]:
@@ -100,7 +108,7 @@ class TasteProfile:
                 tokens.update(t for t in item.lower().replace("/", " ").split() if len(t) > 2)
         if self.vibe:
             tokens.update(t for t in self.vibe.lower().split() if len(t) > 2)
-        return tokens - {w for w in ("and", "the", "with", "for")}
+        return tokens - {"and", "the", "with", "for"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,7 +136,7 @@ class Brief:
     # -- derived ------------------------------------------------------------ #
     @property
     def budget_total(self) -> float:
-        return self.budget_total_minor / (10 ** self.currency.info.decimals)
+        return float(self.budget_total_minor / (10**self.currency.info.decimals))
 
     @property
     def display_title(self) -> str:

@@ -55,11 +55,11 @@ class Planner:
 
         brief.validate()
         profile = get_profile(brief.event_type)
-        season = season_for(brief.event_type, brief.event_date.month, override=brief.season_override)
-
-        budget = allocate_budget(
-            brief, profile, season, currency=brief.currency, today=today
+        season = season_for(
+            brief.event_type, brief.event_date.month, override=brief.season_override
         )
+
+        budget = allocate_budget(brief, profile, season, currency=brief.currency, today=today)
         timeline = build_timeline(brief, profile, season, today=today)
         vendors = build_vendors(
             brief,

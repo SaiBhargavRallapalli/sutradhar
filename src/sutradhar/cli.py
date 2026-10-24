@@ -11,6 +11,7 @@ The CLI is a *view* over :mod:`sutradhar.pipeline`; it owns no planning logic
 of its own, which keeps it trivially testable and keeps every interface (CLI,
 HTTP, SDK) behaviourally identical.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -18,20 +19,21 @@ import json
 import os
 import sys
 import textwrap
+from collections.abc import Sequence
 from datetime import date, timedelta
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, cast
 
 from .ai import resolve_provider
 from .ai.brief import try_brief_from_text
 from .config import Settings, load_settings
-from .enums import CityTier, EventType, Priority, RiskLevel, WindExposure
+from .enums import CityTier, EventType, Priority, WindExposure
 from .export import budget_csv, timeline_csv, to_ics, to_markdown, vendor_csv, write_plan
 from .inputs import brief_from_dict
 from .models import Brief, Plan
 from .money import Currency, format_minor
 from .pipeline import plan_event
-from .server.app import serve
+from .server.wsgi import serve
 from .version import __version__
 
 # ---------------------------------------------------------------------------
@@ -39,8 +41,14 @@ from .version import __version__
 # ---------------------------------------------------------------------------
 _RESET = "\x1b[0m"
 _STYLES = {
-    "r": "\x1b[31m", "g": "\x1b[32m", "y": "\x1b[33m", "b": "\x1b[34m",
-    "m": "\x1b[35m", "c": "\x1b[36m", "d": "\x1b[2m", "b1": "\x1b[1m",
+    "r": "\x1b[31m",
+    "g": "\x1b[32m",
+    "y": "\x1b[33m",
+    "b": "\x1b[34m",
+    "m": "\x1b[35m",
+    "c": "\x1b[36m",
+    "d": "\x1b[2m",
+    "b1": "\x1b[1m",
 }
 
 
@@ -77,7 +85,9 @@ def _kv(p: Painter, key: str, value: str, style: str = "") -> str:
 
 def _wrap(text: str, indent: str = "  ") -> list[str]:
     width = max(40, _term_width() - len(indent))
-    return textwrap.wrap(text, width=width, initial_indent=indent, subsequent_indent=indent) or [indent]
+    return textwrap.wrap(text, width=width, initial_indent=indent, subsequent_indent=indent) or [
+        indent
+    ]
 
 
 def _bar(p: Painter, fraction: float, width: int = 20) -> str:
@@ -102,7 +112,9 @@ def render_plan(plan: Plan, p: Painter) -> list[str]:
     out.append("")
     out.append(_kv(p, "Event", f"{b.event_date:%A %d %B %Y}"))
     out.append(_kv(p, "Guests", f"{b.guest_count}"))
-    out.append(_kv(p, "Where", f"{b.location or 'to be decided'} ({b.city_tier.value.replace('_', ' ')})"))
+    out.append(
+        _kv(p, "Where", f"{b.location or 'to be decided'} ({b.city_tier.value.replace('_', ' ')})")
+    )
     out.append(_kv(p, "Setting", b.setting.value))
     if b.host_name:
         out.append(_kv(p, "Host", b.host_name))
@@ -119,18 +131,30 @@ def render_plan(plan: Plan, p: Painter) -> list[str]:
         frac = line.amount_minor / biggest
         flag = "" if line.in_band else "  <-- outside benchmark"
         out.append(
-            "  " + p.p("b1", name) + " " + _bar(p, frac, 18) + " " + p.p("c", amount)
-            + p.p("d", f"  {line.pct:4.1f}%") + p.p("y", flag)
+            "  "
+            + p.p("b1", name)
+            + " "
+            + _bar(p, frac, 18)
+            + " "
+            + p.p("c", amount)
+            + p.p("d", f"  {line.pct:4.1f}%")
+            + p.p("y", flag)
         )
     out.append("  " + p.p("d", "-" * 68))
-    out.append("  " + p.p("d", f"{'spendable'.ljust(26)}") + _money(budget.spendable_minor, money).rjust(24))
     out.append(
-        "  " + p.p("d", f"{'contingency float'.ljust(26)}")
+        "  "
+        + p.p("d", f"{'spendable'.ljust(26)}")
+        + _money(budget.spendable_minor, money).rjust(24)
+    )
+    out.append(
+        "  "
+        + p.p("d", f"{'contingency float'.ljust(26)}")
         + _money(budget.contingency_minor, money).rjust(24)
         + p.p("d", f"  ({budget.contingency_pct:.1f}%)")
     )
     out.append(
-        "  " + p.p("d", f"{'unallocated'.ljust(26)}")
+        "  "
+        + p.p("d", f"{'unallocated'.ljust(26)}")
         + p.p("g", _money(budget.unallocated_minor, money).rjust(24))
         + p.p("d", "  <- always 0, by construction")
     )
@@ -142,7 +166,9 @@ def render_plan(plan: Plan, p: Painter) -> list[str]:
         out.append("  If you need to free up cash, in order of least harm:")
         for t in budget.trade_offs[:3]:
             saving = p.p("g", f"+{_money(t.saving_minor, money)}")
-            out.append(f"    {saving}  {t.action} {t.category_label} {p.p('d', f'[impact: {t.impact.value}]')}")
+            out.append(
+                f"    {saving}  {t.action} {t.category_label} {p.p('d', f'[impact: {t.impact.value}]')}"
+            )
             out.extend(_wrap(t.consequence, indent="        "))
     out.append("")
 
@@ -150,17 +176,27 @@ def render_plan(plan: Plan, p: Painter) -> list[str]:
     out.append(_rule(p, "Timeline"))
     tl = plan.timeline
     out.append(_kv(p, "Planning window", f"{tl.lead_days} days before the event"))
-    out.append(_kv(p, "Critical path", f"{tl.min_required_lead_days} days of hard dependencies", "b1"))
+    out.append(
+        _kv(p, "Critical path", f"{tl.min_required_lead_days} days of hard dependencies", "b1")
+    )
     feasible_style = "g" if tl.feasible else "r"
     out.append(
-        _kv(p, "Feasible", "yes - the window comfortably fits the critical path"
-            if tl.feasible else
-            f"NO - you need at least {tl.min_required_lead_days} days", feasible_style)
+        _kv(
+            p,
+            "Feasible",
+            "yes - the window comfortably fits the critical path"
+            if tl.feasible
+            else f"NO - you need at least {tl.min_required_lead_days} days",
+            feasible_style,
+        )
     )
     out.append(_kv(p, "Season", tl.season.value))
     out.append(_kv(p, "Critical load", f"{tl.critical_load_days} working days cannot slip at all"))
     if tl.critical_path:
-        titles = [tl.task(tid).title if tl.task(tid) else tid for tid in tl.critical_path]
+        titles = []
+        for task_id in tl.critical_path:
+            task = tl.task(task_id)
+            titles.append(task.title if task is not None else task_id)
         out.append("")
         out.append("  The chain that decides your date:")
         for i, title in enumerate(titles, 1):
@@ -172,7 +208,9 @@ def render_plan(plan: Plan, p: Painter) -> list[str]:
         out.append("  Next things on the clock:")
         for task in upcoming:
             mark = p.p("r", "*") if task.critical else p.p("d", "o")
-            out.append(f"    {mark} {task.due:%d %b}  {task.title}  {p.p('d', f'({task.owner.value})')}")
+            out.append(
+                f"    {mark} {task.due:%d %b}  {task.title}  {p.p('d', f'({task.owner.value})')}"
+            )
         if len(tl.tasks) > len(upcoming):
             out.append(p.p("d", f"    ... and {len(tl.tasks) - len(upcoming)} more"))
     if tl.run_of_show:
@@ -188,7 +226,10 @@ def render_plan(plan: Plan, p: Painter) -> list[str]:
     for v in sorted(plan.vendors.items, key=lambda v: v.book_by):
         label = v.label[:30].ljust(30)
         out.append(
-            "  " + p.p("b1", label) + " " + p.p("c", f"{v.deposit_pct:.0f}% deposit")
+            "  "
+            + p.p("b1", label)
+            + " "
+            + p.p("c", f"{v.deposit_pct:.0f}% deposit")
             + p.p("d", f"  book by {v.book_by:%d %b %Y}")
         )
         out.extend(_wrap(v.why, indent="        "))
@@ -203,7 +244,8 @@ def render_plan(plan: Plan, p: Painter) -> list[str]:
                 + p.p("c", _money(m.amount_minor, money).rjust(14))
             )
         out.append(
-            "    " + p.p("d", "deposits total: ")
+            "    "
+            + p.p("d", "deposits total: ")
             + p.p("c", _money(plan.vendors.deposit_total_minor, money))
         )
     out.append("")
@@ -212,9 +254,13 @@ def render_plan(plan: Plan, p: Painter) -> list[str]:
     if plan.risks.items:
         out.append(_rule(p, "Top risks"))
         for r in plan.risks.top(4):
-            sev_style = {"critical": "r", "high": "r", "medium": "y", "low": "d"}.get(r.severity.value, "")
+            sev_style = {"critical": "r", "high": "r", "medium": "y", "low": "d"}.get(
+                r.severity.value, ""
+            )
             out.append(
-                "  " + p.p(sev_style, f"[{r.severity.value.upper():<8}]") + f" {r.title} "
+                "  "
+                + p.p(sev_style, f"[{r.severity.value.upper():<8}]")
+                + f" {r.title} "
                 + p.p("d", f"(likelihood {r.likelihood}/5 x impact {r.impact}/5)")
             )
             out.extend(_wrap(r.mitigation, indent="        "))
@@ -237,7 +283,7 @@ def render_plan(plan: Plan, p: Painter) -> list[str]:
                 out.extend(_wrap(f"Menu: {idea.menu}", indent="      "))
             delta = idea.estimated_delta_pct
             delta_s = f"{delta:+.1f}%" if delta else "no change"
-            out.append(p.p("d", f"      cost: ") + f"{delta_s} - {idea.cost_fit}")
+            out.append(p.p("d", "      cost: ") + f"{delta_s} - {idea.cost_fit}")
             if idea.rationale:
                 out.append(p.p("d", "      why you: ") + idea.rationale)
         out.append("")
@@ -249,7 +295,9 @@ def render_plan(plan: Plan, p: Painter) -> list[str]:
     if other:
         out.append(_rule(p, "Worth knowing"))
         for w in other:
-            style = {"critical": "r", "high": "r", "medium": "y", "low": "d"}.get(w.severity.value, "")
+            style = {"critical": "r", "high": "r", "medium": "y", "low": "d"}.get(
+                w.severity.value, ""
+            )
             out.append("  " + p.p(style, "!") + f" {w.message}")
             if w.suggestion:
                 out.extend(_wrap(w.suggestion, indent="      "))
@@ -258,9 +306,12 @@ def render_plan(plan: Plan, p: Painter) -> list[str]:
     # -- Footer ------------------------------------------------------------
     out.append(_rule(p))
     out.append(
-        p.p("d", f"  {len(plan.timeline.tasks)} tasks · {len(plan.vendors.items)} vendor categories · "
-                 f"{len(plan.ideas)} ideas · ai: {plan.ai_provider}"
-                 f"{'' if not plan.ai_used else ' (used)'}")
+        p.p(
+            "d",
+            f"  {len(plan.timeline.tasks)} tasks · {len(plan.vendors.items)} vendor categories · "
+            f"{len(plan.ideas)} ideas · ai: {plan.ai_provider}"
+            f"{'' if not plan.ai_used else ' (used)'}",
+        )
     )
     return out
 
@@ -323,7 +374,7 @@ def cmd_demo(args: argparse.Namespace) -> int:
     p = Painter(_use_color(args))
     if not args.json:
         print(p.p("b1", f"\n  Sutradhar {__version__} - celebration & event planner"))
-        print(p.p("d", "  deterministic engines, optional LLM, zero runtime dependencies"))
+        print(p.p("d", "  deterministic engines, optional LLM, complete offline fallback"))
     settings = load_settings()
     if args.offline:
         settings = settings.with_overrides(ai_enabled=False)
@@ -350,8 +401,11 @@ def cmd_brief(args: argparse.Namespace) -> int:
 
     provider = _provider_for(settings)
     if provider is None:
-        print("error: parsing a natural-language brief needs a model; "
-              "set SUTRADHAR_PROVIDER or drop --offline", file=sys.stderr)
+        print(
+            "error: parsing a natural-language brief needs a model; "
+            "set SUTRADHAR_PROVIDER or drop --offline",
+            file=sys.stderr,
+        )
         return 2
     brief, message = try_brief_from_text(text, provider, settings)
     if brief is None:
@@ -399,12 +453,18 @@ def _use_color(args: argparse.Namespace) -> bool:
 
 
 def _add_common(sub: Any, name: str, help_text: str) -> argparse.ArgumentParser:
-    parser = sub.add_parser(name, help=help_text, description=help_text)
+    parser = cast(
+        argparse.ArgumentParser,
+        sub.add_parser(name, help=help_text, description=help_text),
+    )
     parser.add_argument("--out", metavar="DIR", help="also write md/json/csv/ics files here")
     parser.add_argument("--json", action="store_true", help="print the full plan as JSON on stdout")
-    parser.add_argument("--no-color", action="store_true", help="disable ANSI colour (or set NO_COLOR)")
-    parser.add_argument("--offline", action="store_true",
-                        help="never call a model; use the built-in catalogue only")
+    parser.add_argument(
+        "--no-color", action="store_true", help="disable ANSI colour (or set NO_COLOR)"
+    )
+    parser.add_argument(
+        "--offline", action="store_true", help="never call a model; use the built-in catalogue only"
+    )
     return parser
 
 
@@ -412,7 +472,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="sutradhar",
         description="Sutradhar - a deterministic, catalogue-driven celebration & event planner. "
-                    "Zero runtime dependencies; a language model is optional and never required.",
+        "The planning core works offline; a language model is optional and never required.",
     )
     parser.add_argument("--version", action="version", version=f"sutradhar {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -430,14 +490,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     export_p = _add_common(sub, "export", "export one artefact from a JSON brief")
     export_p.add_argument("--brief", required=True, metavar="FILE")
-    export_p.add_argument("--format", default="md",
-                          choices=["md", "ics", "budget.csv", "timeline.csv", "vendors.csv"])
+    export_p.add_argument(
+        "--format", default="md", choices=["md", "ics", "budget.csv", "timeline.csv", "vendors.csv"]
+    )
     export_p.set_defaults(func=cmd_export)
 
     web = sub.add_parser("web", help="serve the accessible web UI (no build step)")
     web.add_argument("--host", default="127.0.0.1")
     web.add_argument("--port", type=int, default=8787)
-    web.add_argument("--web-root", default=str(Path(__file__).resolve().parent.parent.parent / "web"))
+    web.add_argument(
+        "--web-root", default=str(Path(__file__).resolve().parent.parent.parent / "web")
+    )
     web.add_argument("--no-color", action="store_true")
     web.set_defaults(func=cmd_web)
     return parser

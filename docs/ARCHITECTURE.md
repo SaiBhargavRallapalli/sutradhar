@@ -42,7 +42,7 @@ demonstrable offline.
 ┌──────────────────────────────────────────────────────────────────────┐
 │  Interfaces                                                          │
 │    cli.py          sutradhar demo | plan | brief | export | web      │
-│    server/app.py   POST /api/plan, GET /api/health, static assets    │
+│    server/wsgi.py  POST /api/plan, GET /api/health, static assets    │
 │    web/            zero-build accessible SPA (index.html/js/css)     │
 ├──────────────────────────────────────────────────────────────────────┤
 │  Orchestration                                                       │
@@ -72,6 +72,7 @@ demonstrable offline.
 │    ai/guardrails.py         input screening, output scrubbing, redact│
 │    ai/schema.py             tiny JSON schema + extractor + validator │
 │    ai/provider.py           OpenAI-compat / Gemini / Mock / Null     │
+│    ai/resilience.py         LRU/TTL, de-dup, cap, circuit breaker     │
 │    ai/prompts.py            system + user prompt builders            │
 │    ai/ideas.py              screen→prompt→call→validate→repair→ground│
 │    ai/brief.py              one-sentence request → structured Brief  │
@@ -203,24 +204,19 @@ changes source, and the provenance field says so.
 
 ---
 
-## 5. Why pure standard library
+## 5. Dependency boundary
 
-`dependencies = []` in `pyproject.toml`, and it is not a stunt:
+The planning core, model transports and exports use only the standard library.
+The deployed interface adds exactly one dependency: `waitress==3.0.2`.
 
-- **Supply-chain risk is real.** An event planner that stores guest names and
-  budgets should not pull 40 transitive packages to render a table. Sutradhar
-  imports nothing outside the standard library at runtime.
-- **Portability.** `python3 -m sutradhar demo` runs on a bare Python 3.10+
-  install — no virtualenv dance, no lockfile, works on an air-gapped laptop at
-  a venue with no wifi.
-- **Auditability.** A reviewer can read every line that touches money, the
-  network or user input. The LLM transport is `urllib`, ~60 lines, and every
-  error path is redacted.
-- **Tiny repo.** The whole project — source, web UI, five verticals, 358 tests —
-  is well under 1 MB.
-
-Dev-only tooling (`pytest`, `ruff`, `mypy`) lives in the `dev` extra and is the
-only thing a contributor installs beyond Python.
+- **Production boundary.** Waitress supplies bounded channels, graceful
+  shutdown and a maintained WSGI runtime on every supported operating system.
+- **Offline planning.** Budgets, timelines, vendors, risks, catalogue ideas and
+  exports still work without a key or network.
+- **Auditability.** Every line touching money, model data or user input remains
+  in this repository; the sole dependency handles HTTP mechanics.
+- **Supply chain.** Runtime and development packages are exact-pinned, CI
+  actions are commit-pinned and Gitleaks scans the complete history.
 
 ---
 
@@ -239,21 +235,22 @@ only thing a contributor installs beyond Python.
 `--json` prints machine-readable output, `--offline` forces catalogue mode,
 `--no-color` / `NO_COLOR` disable ANSI (per the [NO_COLOR standard](https://no-color.org)).
 
-### HTTP server (`server/app.py`)
+### WSGI service (`server/wsgi.py`)
 
-A hardened, deliberately small boundary — see [`SECURITY.md`](SECURITY.md) for
-the full posture. Two endpoints:
+A hardened production boundary served by Waitress — see
+[`SECURITY.md`](SECURITY.md) for the full posture. Two endpoints:
 
 - `POST /api/plan` — brief JSON in, full plan JSON out.
 - `GET /api/health` — liveness + version.
 
-It exists so the web UI has something to talk to; it is **not** a production
-deployment target, and the README says so plainly.
+`server/security.py`, `server/limits.py` and `server/static.py` isolate the
+origin policy, bounded admission controls and preloaded gzip/ETag assets from
+route orchestration. The same WSGI path runs locally, in CI and on Render.
 
 ### Web UI (`web/`)
 
 Zero-build, no framework, no CDN. `index.html` + `styles.css` + `app.js`,
-served by the stdlib server. Rendering uses DOM APIs exclusively — no
+served by the WSGI service. Rendering uses DOM APIs exclusively — no
 `innerHTML` with user or model data anywhere — so there is no XSS path by
 construction. Accessibility was audited in a real browser with **zero issues**
 (skip link, ARIA live regions, focus management to the results heading,
@@ -301,14 +298,14 @@ Three rules, applied everywhere:
 3. **Money is integer minor units.** No floats touch a currency amount. See
    [`ALGORITHMS.md`](ALGORITHMS.md#money).
 
-The practical payoff: the same brief produces byte-identical output today and
-next month, which is what makes 358 tests meaningful and the demo reproducible.
+The practical payoff: the same brief produces byte-identical engine output
+today and next month, which makes 411 tests meaningful and the demo reproducible.
 
 ---
 
 ## 9. Testing strategy
 
-358 tests, organised by the property each one protects — not by file:
+411 tests, organised by the property each one protects — not by file:
 
 | Module | Count | Protects |
 |---|---:|---|
@@ -316,19 +313,24 @@ next month, which is what makes 358 tests meaningful and the demo reproducible.
 | `test_budget.py` | 43 | allocation always reconciles; bands; trade-offs |
 | `test_timeline.py` | 35 | CPM correctness; compression; infeasibility reporting |
 | `test_pipeline.py` | 60 | end-to-end plans; catalog self-checks; degradation |
-| `test_guardrails.py` | 56 | injection, scrubbing, redaction |
+| `test_guardrails.py` | 57 | injection, scrubbing, redaction |
 | `test_schema.py` | 35 | JSON extraction + validation + repair |
 | `test_export.py` | 40 | Markdown/CSV/ICS correctness (ICS: 50 unique UEVENTs) |
-| `test_server.py` | 42 | HTTP contract, headers, traversal, rate limiting |
+| `test_server.py` | 55 | WSGI contract, origin policy, gzip/ETag, bounded limits |
+| `test_ai.py` | 12 | parsing, repair, deadlines, grounding and fallback |
+| `test_cli.py` | 8 | all commands and user-facing error boundaries |
+| `test_provider.py` | 7 | HTTP retries, redaction and provider contracts |
+| `test_config.py` | 6 | environment parsing, clamping and secret handling |
+| `test_resilience.py` | 6 | LRU/TTL, concurrency, cap and circuit breaker |
 
 The suite runs fully offline with no credentials — the `MockProvider` exercises
 the real validation and grounding path, so the safety-critical model boundary is
 covered without a network.
 
 CI (`.github/workflows/ci.yml`) runs tests on Python 3.10/3.11/3.12 across
-Linux, macOS and Windows, plus a lint/format/mypy-strict job, a CLI + server
-smoke job (including security-header and path-traversal checks), and a repo-size
-budget.
+Linux, macOS and Windows, plus Ruff, formatting, strict mypy, an 85% combined
+coverage floor, a live Waitress smoke job, full-history Gitleaks, a 50 KB web
+asset budget and the challenge repository-size budget.
 
 ---
 
@@ -342,7 +344,7 @@ budget.
 | `ai/*.py` | ~1,100 | guardrails, schema, providers, prompts, ideas, brief |
 | `cli.py` | ~450 | the command line |
 | `export.py` | ~430 | Markdown, CSV ×3, ICS |
-| `server/app.py` | ~360 | hardened HTTP boundary |
+| `server/*.py` | ~500 | WSGI routes, security, limits, static delivery |
 | `money.py` | ~206 | integer minor units + formatting |
 | `inputs.py` | ~250 | dict/JSON → validated Brief |
 | `pipeline.py` | ~138 | orchestration |

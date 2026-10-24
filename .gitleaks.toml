@@ -1,0 +1,5 @@
+[[allowlists]]
+description = "Synthetic credential-shaped fixtures used only to test redaction"
+paths = [
+  '''tests/test_guardrails\.py''',
+]

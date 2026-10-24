@@ -5,6 +5,7 @@ a :class:`Brief`, get back a complete :class:`Plan`. The assertions are about
 *invariants that must hold for every plan*, because those are what make the
 output trustworthy.
 """
+
 from __future__ import annotations
 
 import json
@@ -12,25 +13,30 @@ from datetime import date
 
 import pytest
 
-from sutradhar import Brief, CityTier, Currency, EventType, Priority, Season, plan_event
+from sutradhar import Brief, CityTier, Currency, EventType, Season, plan_event
 from sutradhar.config import Settings
 from sutradhar.exceptions import BriefError
 from sutradhar.models import Plan, TasteProfile
 
-EVENT_TYPES = [EventType.WEDDING, EventType.BIRTHDAY, EventType.COMMUNITY,
-               EventType.HOUSEWARMING, EventType.ANNIVERSARY]
+EVENT_TYPES = [
+    EventType.WEDDING,
+    EventType.BIRTHDAY,
+    EventType.COMMUNITY,
+    EventType.HOUSEWARMING,
+    EventType.ANNIVERSARY,
+]
 
 
 def _brief(et: EventType = EventType.WEDDING, **kwargs) -> Brief:
-    defaults = dict(
-        event_type=et,
-        event_date=date(2027, 6, 6),
-        guest_count=150,
-        budget_total_minor=8_00_000_00,
-        currency=Currency.INR,
-        city_tier=CityTier.TIER_2,
-        location="Pune",
-    )
+    defaults = {
+        "event_type": et,
+        "event_date": date(2027, 6, 6),
+        "guest_count": 150,
+        "budget_total_minor": 8_00_000_00,
+        "currency": Currency.INR,
+        "city_tier": CityTier.TIER_2,
+        "location": "Pune",
+    }
     defaults.update(kwargs)
     return Brief(**defaults)
 
@@ -42,7 +48,7 @@ class TestInvariants:
     def test_budget_reconciles_exactly(self, et: EventType, offline_settings: Settings) -> None:
         plan = plan_event(_brief(et), settings=offline_settings, today=date(2026, 1, 1))
         assert plan.budget.unallocated_minor == 0
-        assert sum(l.amount_minor for l in plan.budget.lines) == plan.budget.spendable_minor
+        assert sum(line.amount_minor for line in plan.budget.lines) == plan.budget.spendable_minor
 
     @pytest.mark.parametrize("et", EVENT_TYPES)
     def test_every_section_is_populated(self, et: EventType, offline_settings: Settings) -> None:
@@ -54,7 +60,9 @@ class TestInvariants:
         assert plan.ideas
 
     @pytest.mark.parametrize("et", EVENT_TYPES)
-    def test_vendor_book_by_dates_precede_the_event(self, et: EventType, offline_settings: Settings) -> None:
+    def test_vendor_book_by_dates_precede_the_event(
+        self, et: EventType, offline_settings: Settings
+    ) -> None:
         plan = plan_event(_brief(et), settings=offline_settings, today=date(2026, 1, 1))
         for v in plan.vendors.items:
             assert v.book_by <= plan.brief.event_date, f"{v.label} booked after the event"
@@ -78,9 +86,7 @@ class TestInvariants:
             assert 1 <= r.impact <= 5
 
     @pytest.mark.parametrize("et", EVENT_TYPES)
-    def test_every_idea_is_grounded(
-        self, et: EventType, offline_settings: Settings
-    ) -> None:
+    def test_every_idea_is_grounded(self, et: EventType, offline_settings: Settings) -> None:
         """An idea that does not fit the budget must never be presented as if it did."""
         plan = plan_event(_brief(et), settings=offline_settings, today=date(2026, 1, 1))
         for idea in plan.ideas:
@@ -120,9 +126,13 @@ class TestPersonalisation:
     def test_taste_shows_up_in_the_chosen_ideas(self, offline_settings: Settings) -> None:
         plain = plan_event(_brief(), settings=offline_settings, today=date(2026, 1, 1))
         styled = plan_event(
-            _brief(taste=TasteProfile(vibe="minimal modern",
-                                      style_keywords=("minimal", "modern", "monochrome"))),
-            settings=offline_settings, today=date(2026, 1, 1),
+            _brief(
+                taste=TasteProfile(
+                    vibe="minimal modern", style_keywords=("minimal", "modern", "monochrome")
+                )
+            ),
+            settings=offline_settings,
+            today=date(2026, 1, 1),
         )
         plain_names = [i.name for i in plain.ideas]
         styled_names = [i.name for i in styled.ideas]
@@ -131,7 +141,8 @@ class TestPersonalisation:
     def test_avoid_list_can_suppress_a_theme(self, offline_settings: Settings) -> None:
         plan = plan_event(
             _brief(taste=TasteProfile(avoid=("traditional", "temple", "brass"))),
-            settings=offline_settings, today=date(2026, 1, 1),
+            settings=offline_settings,
+            today=date(2026, 1, 1),
         )
         for idea in plan.ideas:
             assert "temple" not in idea.name.lower()
@@ -150,33 +161,46 @@ class TestValidation:
 
     def test_zero_budget_raises(self, offline_settings: Settings) -> None:
         with pytest.raises(BriefError):
-            plan_event(_brief(budget_total_minor=0), settings=offline_settings, today=date(2026, 1, 1))
+            plan_event(
+                _brief(budget_total_minor=0), settings=offline_settings, today=date(2026, 1, 1)
+            )
 
     def test_past_date_still_plans_but_reports_lead_time(self, offline_settings: Settings) -> None:
         """A date in the past is a planning mistake, not a crash."""
-        plan = plan_event(_brief(event_date=date(2020, 1, 1)), settings=offline_settings,
-                          today=date(2026, 1, 1))
+        plan = plan_event(
+            _brief(event_date=date(2020, 1, 1)), settings=offline_settings, today=date(2026, 1, 1)
+        )
         assert plan.timeline.lead_days < 0
         assert plan.timeline.feasible is False
 
 
 class TestBudgetScaling:
     @pytest.mark.parametrize("guests", [30, 100, 500, 1500])
-    def test_plan_survives_extreme_guest_counts(self, guests: int, offline_settings: Settings) -> None:
-        plan = plan_event(_brief(guest_count=guests), settings=offline_settings, today=date(2026, 1, 1))
+    def test_plan_survives_extreme_guest_counts(
+        self, guests: int, offline_settings: Settings
+    ) -> None:
+        plan = plan_event(
+            _brief(guest_count=guests), settings=offline_settings, today=date(2026, 1, 1)
+        )
         assert plan.budget.unallocated_minor == 0
 
     @pytest.mark.parametrize("total", [1_00_000, 10_00_000, 1_00_00_000, 10_00_00_000])
     def test_plan_survives_extreme_budgets(self, total: int, offline_settings: Settings) -> None:
-        plan = plan_event(_brief(budget_total_minor=total), settings=offline_settings,
-                          today=date(2026, 1, 1))
+        plan = plan_event(
+            _brief(budget_total_minor=total), settings=offline_settings, today=date(2026, 1, 1)
+        )
         assert plan.budget.unallocated_minor == 0
-        assert all(l.amount_minor >= 0 for l in plan.budget.lines)
+        assert all(line.amount_minor >= 0 for line in plan.budget.lines)
 
-    def test_a_tiny_budget_does_not_produce_negative_lines(self, offline_settings: Settings) -> None:
-        plan = plan_event(_brief(guest_count=500, budget_total_minor=10_00),
-                           settings=offline_settings, today=date(2026, 1, 1))
-        assert all(l.amount_minor >= 0 for l in plan.budget.lines)
+    def test_a_tiny_budget_does_not_produce_negative_lines(
+        self, offline_settings: Settings
+    ) -> None:
+        plan = plan_event(
+            _brief(guest_count=500, budget_total_minor=10_00),
+            settings=offline_settings,
+            today=date(2026, 1, 1),
+        )
+        assert all(line.amount_minor >= 0 for line in plan.budget.lines)
 
 
 class TestSerialisation:
@@ -201,8 +225,9 @@ class TestSerialisation:
         assert "datetime.datetime(" not in text
 
     def test_json_is_unicode_clean(self, offline_settings: Settings) -> None:
-        plan = plan_event(_brief(title="Aarav & Meera"), settings=offline_settings,
-                          today=date(2026, 1, 1))
+        plan = plan_event(
+            _brief(title="Aarav & Meera"), settings=offline_settings, today=date(2026, 1, 1)
+        )
         json.loads(plan.to_json())  # must not raise
 
     def test_toplevel_plan_is_a_model(self, offline_settings: Settings) -> None:
@@ -212,10 +237,14 @@ class TestSerialisation:
 
 class TestSeasonHandling:
     def test_explicit_season_override_is_honoured(self, offline_settings: Settings) -> None:
-        off = plan_event(_brief(season_override=Season.OFF_PEAK), settings=offline_settings,
-                         today=date(2026, 1, 1))
-        peak = plan_event(_brief(season_override=Season.PEAK), settings=offline_settings,
-                          today=date(2026, 1, 1))
+        off = plan_event(
+            _brief(season_override=Season.OFF_PEAK),
+            settings=offline_settings,
+            today=date(2026, 1, 1),
+        )
+        peak = plan_event(
+            _brief(season_override=Season.PEAK), settings=offline_settings, today=date(2026, 1, 1)
+        )
         assert off.timeline.season is Season.OFF_PEAK
         assert peak.timeline.season is Season.PEAK
 

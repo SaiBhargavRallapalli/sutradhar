@@ -1,5 +1,9 @@
 # Sutradhar — the Celebration & Event Planner
 
+[![CI](https://github.com/SaiBhargavRallapalli/sutradhar/actions/workflows/ci.yml/badge.svg)](https://github.com/SaiBhargavRallapalli/sutradhar/actions/workflows/ci.yml)
+
+**Live app:** [https://sutradhar-it6j.onrender.com](https://sutradhar-it6j.onrender.com)
+
 **Sutradhar** (सूत्रधार — *"the one who holds the thread"*) is a GenAI planning
 co-pilot for **weddings, birthdays, community events, housewarmings and
 anniversaries**. Give it a date, a guest count and a budget and it returns a
@@ -8,13 +12,13 @@ with slack and a minimum lead time, a vendor checklist with a dated cash-flow
 plan, a scored risk register, and personalised concepts grounded against real
 numbers.
 
-*Zero runtime dependencies. Deterministic engines. A language model is optional
-and never required.*
+*Standard-library planning core. One exact-pinned production server dependency.
+A language model is optional and never required.*
 
 ```
 $ python -m sutradhar.cli demo
   Sutradhar 1.0.0 - celebration & event planner
-  deterministic engines, optional LLM, zero runtime dependencies
+  deterministic engines, optional LLM, complete offline fallback
 ```
 
 ---
@@ -47,20 +51,21 @@ product demonstrates perfectly with **no API key, no network and no GPU**.
 
 ## Quick start
 
-Requires **Python 3.10+** and nothing else.
+Requires **Python 3.10+**.
 
 ```bash
-git clone https://github.com/<you>/sutradhar && cd sutradhar
+git clone https://github.com/SaiBhargavRallapalli/sutradhar && cd sutradhar
+python -m pip install -e .
 
-python -m sutradhar.cli demo          # a full wedding plan, in your terminal
+sutradhar demo                        # a full wedding plan, in your terminal
 make web                              # accessible web UI at http://127.0.0.1:8787
-python -m sutradhar.cli brief "plan a 150 guest wedding in Hyderabad on 14 Feb 2027, budget 25 lakh, outdoor, garden vibes"
-python -m sutradhar.cli export --brief plan.json --out out/   # .md + 3× .csv + .ics
+sutradhar brief --text "plan a 150 guest wedding in Hyderabad on 14 Feb 2027, budget 25 lakh, outdoor, garden vibes"
+sutradhar export --brief plan.json --out out/   # .md + 3× .csv + .ics
 ```
 
-No `pip install`, no lockfile, no virtualenv strictly required — the `src`
-layout works directly with `PYTHONPATH=src`, or install it properly with
-`pip install -e .` to get the `sutradhar` command.
+The deterministic planning core and all provider transports use the Python
+standard library. `waitress==3.0.2` is the only runtime dependency; it supplies
+the bounded, production WSGI server used locally and on Render.
 
 Optional model access (everything works without it):
 
@@ -164,8 +169,8 @@ warnings and the day-of run sheet.
 | **Warnings** | Machine-checkable advisories (`short_lead_time`, `tight_but_feasible`, …) | Every warning carries a severity, a section and a suggested next action |
 
 Every plan also records **provenance**: `plan.provenance["ideas"]` tells you
-whether prose came from the catalogue or a model, and `--trace`/`SUTRADHAR_TRACE_PROVENANCE`
-prints it per section.
+whether prose came from the catalogue or a model. The JSON output and web UI
+surface that source directly.
 
 ---
 
@@ -240,9 +245,13 @@ Everything works with **zero configuration**. To enable model prose, copy
 | `SUTRADHAR_OPENAI_API_KEY` / `_BASE_URL` / `_MODEL` | — / `api.openai.com/v1` / `gpt-4o-mini` | OpenAI-compatible `POST /chat/completions` — also covers Groq, Together, OpenRouter, Mistral, LM Studio, llama.cpp, vLLM, Ollama `/v1` |
 | `SUTRADHAR_GEMINI_API_KEY` / `_MODEL` | — / `gemini-2.5-flash` | Gemini `generateContent` endpoint |
 | `SUTRADHAR_AI_ENABLED` | `1` | `0` = pure deterministic planning, no outbound calls ever |
-| `SUTRADHAR_AI_MAX_REPAIRS` | `2` | Repair attempts on malformed model JSON (clamped 0–5) |
+| `SUTRADHAR_AI_MAX_REPAIRS` | `1` | Repair attempts on malformed model JSON (clamped 0–2) |
 | `SUTRADHAR_AI_MAX_PROMPT_CHARS` | `6000` | Hard ceiling on outbound prompt size |
-| `SUTRADHAR_AI_TIMEOUT` | `45` | Per-request timeout, seconds (clamped 5–300) |
+| `SUTRADHAR_AI_TIMEOUT` | `40` | Total model budget across initial + repair calls (clamped 5–60 seconds) |
+| `SUTRADHAR_AI_CACHE_ENTRIES` / `_TTL` | `128` / `21600` | Bounded in-memory LRU size and TTL; keys are SHA-256 prompt digests |
+| `SUTRADHAR_AI_DAILY_CAP` | `500` | Per-instance upstream model-call budget; cache hits do not consume it |
+| `SUTRADHAR_AI_BREAKER_THRESHOLD` / `_COOLDOWN` | `3` / `60` | Consecutive failures before fail-fast fallback, and cooldown seconds |
+| `SUTRADHAR_TRUST_PROXY` | auto on Render | Trust one managed ingress hop for per-client rate limiting |
 
 `.env` is git-ignored; keys live in the environment only and are scrubbed from
 all output by `ai.guardrails.redact`.
@@ -251,18 +260,24 @@ all output by `ai.guardrails.redact`.
 
 ## Testing
 
-**358 tests, zero runtime dependencies** (stdlib + pytest):
+**411 tests** with **92% combined statement/branch coverage** (95% lines,
+85% branches); CI enforces a minimum of 85%:
 
 | File | Tests | Covers |
 |---|---|---|
 | `test_pipeline.py` | 60 | End-to-end plans for every event type |
-| `test_guardrails.py` | 56 | Secret redaction, schema repair, output validation |
+| `test_guardrails.py` | 57 | Secret redaction, prompt screening, safe output rendering |
+| `test_server.py` | 55 | WSGI routes, origin policy, headers, gzip/ETag, limits |
 | `test_money.py` | 47 | Paise arithmetic, rounding, formatting |
 | `test_budget.py` | 43 | Reconciliation (`unallocated == 0`), contingency, trims |
-| `test_server.py` | 42 | Routes, 4xx validation, body limits, UTF-8 |
 | `test_export.py` | 40 | md/csv/ics byte-level output |
 | `test_schema.py` | 35 | Brief parsing, natural-language inputs |
 | `test_timeline.py` | 35 | Critical path, slack, compaction, feasibility |
+| `test_ai.py` | 12 | Model parsing, repair, grounding, fallback, deadlines |
+| `test_cli.py` | 8 | Every CLI command and error boundary |
+| `test_provider.py` | 7 | Transport retries, redaction, response contracts |
+| `test_config.py` | 6 | Environment parsing, clamping, secret-safe settings |
+| `test_resilience.py` | 6 | LRU/TTL, in-flight dedupe, circuit breaker, daily cap |
 
 ```bash
 make test    # or: PYTHONPATH=src python3 -m pytest
@@ -280,11 +295,12 @@ the summary for evaluators:
   printed string, never written to exports, logs or errors.
 - **Server hardens by default**: strict content-type checks (415), malformed-JSON
   and empty-body rejection (400), oversized-body rejection (413), invalid-brief
-  rejection (422), path-traversal-safe static serving, no `eval`/shell interpolation.
-- **Bounded resources**: clamped timeouts, prompt ceilings and repair counts so a
-  hostile `.env` or a misbehaving model can't loop, balloon memory or stall the CLI.
-- **Dependency posture**: zero runtime dependencies means (almost) no supply
-  chain; dev tooling is pinned in `pyproject.toml`.
+  rejection (422), unknown-field rejection, same-origin writes, bounded per-client
+  rate limits, path-safe static serving, and no `eval`/shell interpolation.
+- **Bounded resources**: 32 KB bodies, 40-second total model budget, one retry,
+  bounded LRU/TTL cache, in-flight deduplication, daily cap and circuit breaker.
+- **Supply chain**: one exact-pinned runtime package, exact-pinned development
+  tools, commit-pinned CI actions and full-history Gitleaks scanning.
 
 ---
 
@@ -295,7 +311,7 @@ the summary for evaluators:
   colour alone (every verdict also prints as words: `Feasible yes/NO`).
 - Plain-text CLI output and CSV exports work with screen readers; the web UI
   ships no animation or autoplay.
-- Works offline on Python 3.10+ with no network, no GPU and no install step —
+- Works offline on Python 3.10+ with no network and no GPU —
   the environments many real hosts actually have.
 
 ---
@@ -327,9 +343,9 @@ src/sutradhar/
   inputs.py       # brief parsing ("15 lakh", "14 Feb 2027") + validation
   money.py        # paise-integer arithmetic — the reason budgets always reconcile
   export.py       # md + 3x csv + ics from one in-memory plan
-  server/         # stdlib-only HTTP server + JSON API
+  server/         # Waitress/WSGI API, security policy, limits, static cache
   cli.py          # demo | plan | brief | export | web
-tests/            # 358 tests, see table above
+tests/            # 411 tests, see table above
 web/              # dependency-free UI (index.html, app.js, styles.css)
 docs/             # ARCHITECTURE.md, ALGORITHMS.md, SECURITY.md
 ```
@@ -347,8 +363,8 @@ Deep dives: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (module map, data flo
 | Problem alignment (high) | Budgets that reconcile, schedules with critical paths, grounded ideas — the three real failure modes |
 | Code quality (high) | `src/` layout, typed modules, pure-function engines, `make check` (ruff + strict mypy) |
 | Security (medium) | `docs/SECURITY.md`, guardrails, server validation, env-only secrets |
-| Efficiency (medium) | Zero dependencies, integer money math, single-pass scheduling, bounded AI calls |
-| Testing (low) | 358 tests incl. reconciliation invariants and byte-level export checks |
+| Efficiency (medium) | Integer money math, single-pass scheduling, gzip/ETag assets, AI LRU + in-flight dedupe |
+| Testing (low) | 411 tests, 92% combined coverage, multi-OS CI, reconciliation + concurrency invariants |
 | Accessibility (low) | Keyboard-first web UI, no-color mode, offline-first, screen-reader-safe output |
 
 ---

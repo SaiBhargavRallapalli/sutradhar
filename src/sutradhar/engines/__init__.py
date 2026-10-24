@@ -16,10 +16,10 @@ from .vendors import build_vendors
 
 __all__ = [
     "allocate_budget",
+    "build_risks",
     "build_timeline",
     "build_vendors",
-    "build_risks",
-    "risk_warnings",
     "catalogue_ideas",
     "ground_concepts",
+    "risk_warnings",
 ]

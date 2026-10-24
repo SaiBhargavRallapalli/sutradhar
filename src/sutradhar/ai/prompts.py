@@ -9,13 +9,13 @@ host-supplied text arrives already screened and wrapped as data.
 from __future__ import annotations
 
 from ..catalog.specs import EventTypeProfile
-from ..models import BudgetPlan, Brief
+from ..models import Brief, BudgetPlan
 
 __all__ = [
     "IDEAS_SYSTEM",
+    "budget_summary",
     "build_ideas_user",
     "build_repair_user",
-    "budget_summary",
 ]
 
 #: System prompt for the ideas call. The rules section is the contract the
@@ -64,7 +64,9 @@ def budget_summary(budget: BudgetPlan, symbol: str) -> str:
     invent numbers, which is what keeps its prose anchored to reality.
     """
     top = budget.lines[:6]
-    lines = [f"- {line.label}: {symbol}{line.amount_minor / 100:,.0f} ({line.pct:.0f}%)" for line in top]
+    lines = [
+        f"- {line.label}: {symbol}{line.amount_minor / 100:,.0f} ({line.pct:.0f}%)" for line in top
+    ]
     return "\n".join(
         [
             f"Total budget: {symbol}{budget.total_minor / 100:,.0f}",

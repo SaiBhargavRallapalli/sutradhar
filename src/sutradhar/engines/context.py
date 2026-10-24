@@ -14,7 +14,7 @@ from ..catalog.registry import season_multiplier
 from ..enums import CityTier, EventType, Season, WindExposure
 from ..models import Brief
 
-__all__ = ["CostContext", "cost_context", "TIER_INDEX"]
+__all__ = ["TIER_INDEX", "CostContext", "cost_context"]
 
 #: Rough relative cost-of-living index by city tier, anchored at tier-1 = 1.0.
 #: Used for advice and for re-weighting the categories that genuinely get

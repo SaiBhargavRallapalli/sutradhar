@@ -9,8 +9,10 @@ Three properties matter here and each is a promise the engine makes:
 * **Honesty about feasibility** - a cramped plan says so, and says by how
   much; a compacted plan reports that it compacted.
 """
+
 from __future__ import annotations
 
+import itertools
 from datetime import date
 
 import pytest
@@ -42,8 +44,12 @@ TODAY = date(2026, 1, 1)
 
 def _spec(id: str, *, deps: tuple[str, ...] = (), offset: int = -10, duration: int = 1) -> TaskSpec:
     return TaskSpec(
-        id=id, title=id.title(), offset_days=offset, duration_days=duration,
-        owner=OwnerRole.HOST, depends_on=deps,
+        id=id,
+        title=id.title(),
+        offset_days=offset,
+        duration_days=duration,
+        owner=OwnerRole.HOST,
+        depends_on=deps,
     )
 
 
@@ -79,8 +85,12 @@ class TestTopologicalOrder:
 class TestCriticalPath:
     def test_picks_the_longest_chain_not_the_first(self) -> None:
         # Two routes to `end`: a(1)->b(1) = 2, and c(10) = 10.
-        specs = (_spec("a", duration=1), _spec("b", deps=("a",), duration=1),
-                 _spec("c", duration=10), _spec("end", deps=("b", "c"), duration=1))
+        specs = (
+            _spec("a", duration=1),
+            _spec("b", deps=("a",), duration=1),
+            _spec("c", duration=10),
+            _spec("end", deps=("b", "c"), duration=1),
+        )
         durations = {s.id: s.duration_days for s in specs}
         path = critical_path(topological_order(specs), durations)
         assert path == ["c", "end"]
@@ -91,7 +101,7 @@ class TestCriticalPath:
         path = critical_path(order, durations)
         by_id = {s.id: s for s in WEDDING.tasks}
         # Every step after the first must actually depend on the one before it.
-        for prev, curr in zip(path, path[1:]):
+        for prev, curr in itertools.pairwise(path):
             assert prev in by_id[curr].depends_on, f"{curr} does not depend on {prev}"
 
     def test_path_length_equals_min_required_lead_for_the_wedding(self) -> None:
@@ -111,7 +121,11 @@ class TestCriticalPath:
 
     def test_deterministic_on_ties(self) -> None:
         # Two equal-length routes: the tie must break the same way every time.
-        specs = (_spec("a", duration=5), _spec("b", duration=5), _spec("end", deps=("a", "b"), duration=1))
+        specs = (
+            _spec("a", duration=5),
+            _spec("b", duration=5),
+            _spec("end", deps=("a", "b"), duration=1),
+        )
         durations = {s.id: s.duration_days for s in specs}
         order = topological_order(specs)
         first = critical_path(order, durations)
@@ -189,16 +203,18 @@ class TestFeasibility:
 
     def test_infeasible_plan_carries_a_warning(self) -> None:
         plan = build_timeline(_brief(20), WEDDING, Season.OFF_PEAK, today=TODAY)
-        assert any("lead" in w.message.lower() or "days" in w.message.lower()
-                   for w in plan.warnings), "an infeasible plan must say so"
+        assert any(
+            "lead" in w.message.lower() or "days" in w.message.lower() for w in plan.warnings
+        ), "an infeasible plan must say so"
 
     def test_a_tight_but_possible_window_compacts_rather_than_fails(self) -> None:
         # Comfortably above the floor, but short of the ideal 333-day spread.
         plan = build_timeline(_brief(120), WEDDING, Season.OFF_PEAK, today=TODAY)
         assert plan.min_required_lead_days <= 120
-        assert any(w.code in {"schedule_compacted", "compressed_tasks", "tight_but_feasible"}
-                   for w in plan.warnings), \
-            "a squeezed schedule should be reported, not applied silently"
+        assert any(
+            w.code in {"schedule_compacted", "compressed_tasks", "tight_but_feasible"}
+            for w in plan.warnings
+        ), "a squeezed schedule should be reported, not applied silently"
 
     def test_compaction_keeps_dependency_order(self) -> None:
         plan = build_timeline(_brief(120), WEDDING, Season.OFF_PEAK, today=TODAY)
@@ -209,8 +225,11 @@ class TestFeasibility:
 
     def test_compression_reports_which_tasks_were_squeezed(self) -> None:
         plan = build_timeline(_brief(120), WEDDING, Season.OFF_PEAK, today=TODAY)
-        compressed = [w for w in plan.warnings if "shorten" in w.message.lower()
-                      or "compress" in w.message.lower()]
+        compressed = [
+            w
+            for w in plan.warnings
+            if "shorten" in w.message.lower() or "compress" in w.message.lower()
+        ]
         for w in compressed:
             assert w.suggestion, "a compression warning must tell the host what to do"
 
@@ -227,17 +246,28 @@ class TestDeterminism:
     def test_same_brief_same_timeline(self) -> None:
         a = build_timeline(_brief(300), WEDDING, Season.OFF_PEAK, today=TODAY)
         b = build_timeline(_brief(300), WEDDING, Season.OFF_PEAK, today=TODAY)
-        assert [(t.id, t.due, t.slack_days, t.critical) for t in a.tasks] == \
-               [(t.id, t.due, t.slack_days, t.critical) for t in b.tasks]
+        assert [(t.id, t.due, t.slack_days, t.critical) for t in a.tasks] == [
+            (t.id, t.due, t.slack_days, t.critical) for t in b.tasks
+        ]
 
-    @pytest.mark.parametrize("et", [EventType.WEDDING, EventType.BIRTHDAY,
-                                    EventType.COMMUNITY, EventType.HOUSEWARMING,
-                                    EventType.ANNIVERSARY])
+    @pytest.mark.parametrize(
+        "et",
+        [
+            EventType.WEDDING,
+            EventType.BIRTHDAY,
+            EventType.COMMUNITY,
+            EventType.HOUSEWARMING,
+            EventType.ANNIVERSARY,
+        ],
+    )
     def test_every_catalogue_schedules_cleanly(self, et: EventType) -> None:
         profile = get_profile(et)
         brief = Brief(
-            event_type=et, event_date=date(2027, 6, 6), guest_count=100,
-            budget_total_minor=5_00_000_00, currency=Currency.INR,
+            event_type=et,
+            event_date=date(2027, 6, 6),
+            guest_count=100,
+            budget_total_minor=5_00_000_00,
+            currency=Currency.INR,
         )
         plan = build_timeline(brief, profile, Season.OFF_PEAK, today=TODAY)
         assert len(plan.tasks) == len(profile.tasks)

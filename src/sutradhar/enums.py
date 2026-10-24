@@ -9,15 +9,15 @@ from __future__ import annotations
 from enum import Enum
 
 __all__ = [
-    "EventType",
-    "CityTier",
     "CategoryKind",
-    "Priority",
-    "TaskStatus",
-    "RiskLevel",
-    "Source",
+    "CityTier",
+    "EventType",
     "OwnerRole",
+    "Priority",
+    "RiskLevel",
     "Season",
+    "Source",
+    "TaskStatus",
     "WindExposure",
 ]
 
@@ -26,7 +26,7 @@ class _Parsable(Enum):
     """Mixin adding a forgiving, case-insensitive string parser."""
 
     @classmethod
-    def parse(cls, value: str) -> "_Parsable":
+    def parse(cls, value: str) -> _Parsable:
         """Parse ``value`` into a member, accepting names *or* values.
 
         Accepts ``"wedding"``, ``"WEDDING"`` and ``"EventType.WEDDING"``.
@@ -34,7 +34,11 @@ class _Parsable(Enum):
         """
         raw = value.strip().lower()
         for member in cls:
-            if raw in {member.value.lower(), member.name.lower(), f"{cls.__name__}.{member.name}".lower()}:
+            if raw in {
+                member.value.lower(),
+                member.name.lower(),
+                f"{cls.__name__}.{member.name}".lower(),
+            }:
                 return member
         options = ", ".join(m.value for m in cls)
         raise ValueError(f"unknown {cls.__name__} {value!r}; expected one of: {options}")
@@ -115,7 +119,9 @@ class RiskLevel(str, _Parsable):
 
     @property
     def rank(self) -> int:
-        return {RiskLevel.LOW: 1, RiskLevel.MEDIUM: 2, RiskLevel.HIGH: 3, RiskLevel.CRITICAL: 4}[self]
+        return {RiskLevel.LOW: 1, RiskLevel.MEDIUM: 2, RiskLevel.HIGH: 3, RiskLevel.CRITICAL: 4}[
+            self
+        ]
 
 
 class Source(str, _Parsable):

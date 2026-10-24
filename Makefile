@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 PYTHON ?= python3
 
-.PHONY: help install test cov lint fmt typecheck check demo web clean
+.PHONY: help install test cov lint fmt fmt-check typecheck check demo web clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -22,10 +22,13 @@ lint: ## Lint with ruff
 fmt: ## Format with ruff
 	$(PYTHON) -m ruff format src tests
 
+fmt-check: ## Verify formatting without modifying files
+	$(PYTHON) -m ruff format --check src tests
+
 typecheck: ## Static type checking with mypy (strict)
 	$(PYTHON) -m mypy
 
-check: lint typecheck test ## Lint + typecheck + test
+check: lint fmt-check typecheck cov ## Lint + format + types + coverage-gated tests
 
 demo: ## Generate a full demo plan in the terminal
 	$(PYTHON) -m sutradhar.cli demo --no-color

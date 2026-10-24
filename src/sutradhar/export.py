@@ -26,11 +26,11 @@ from .models import Plan
 from .money import format_minor
 
 __all__ = [
-    "to_markdown",
     "budget_csv",
     "timeline_csv",
-    "vendor_csv",
     "to_ics",
+    "to_markdown",
+    "vendor_csv",
     "write_plan",
 ]
 
@@ -53,7 +53,7 @@ def to_markdown(plan: Plan) -> str:
     brief = plan.brief
     budget = plan.budget
     timeline = plan.timeline
-    sym = _symbol(plan)
+    _symbol(plan)
 
     out: list[str] = []
     out.append(f"# {brief.display_title}")
@@ -71,7 +71,9 @@ def to_markdown(plan: Plan) -> str:
     out.append("| | |")
     out.append("|---|---|")
     out.append(f"| Total budget | {_money(budget.total_minor, plan)} |")
-    out.append(f"| Reserved as contingency ({budget.contingency_pct:.0f}%) | {_money(budget.contingency_minor, plan)} |")
+    out.append(
+        f"| Reserved as contingency ({budget.contingency_pct:.0f}%) | {_money(budget.contingency_minor, plan)} |"
+    )
     out.append(f"| Cost per guest | {_money(budget.per_guest_minor, plan)} |")
     out.append(
         f"| Lead time | {timeline.lead_days} days available, "
@@ -134,8 +136,7 @@ def to_markdown(plan: Plan) -> str:
     out.append("")
     if timeline.critical_path:
         out.append(
-            "**Critical path (do these first, in order):** "
-            + " → ".join(timeline.critical_path)
+            "**Critical path (do these first, in order):** " + " → ".join(timeline.critical_path)
         )
         out.append("")
 
@@ -157,11 +158,7 @@ def to_markdown(plan: Plan) -> str:
         for slot in timeline.run_of_show:
             if slot.day_offset != current:
                 current = slot.day_offset
-                label = (
-                    "Event day"
-                    if current == 0
-                    else f"{abs(current)} day(s) before the event"
-                )
+                label = "Event day" if current == 0 else f"{abs(current)} day(s) before the event"
                 out.append(f"**{label}**")
                 out.append("")
                 out.append("| Time | What | Who | Notes |")
@@ -267,15 +264,17 @@ def budget_csv(plan: Plan) -> str:
     """Budget lines as CSV, with a header row and UTF-8 BOM for Excel."""
     buffer = io.StringIO()
     writer = csv.writer(buffer)
-    writer.writerow(["category", "amount", "currency", "pct_of_spendable", "per_guest", "in_band", "rationale"])
+    writer.writerow(
+        ["category", "amount", "currency", "pct_of_spendable", "per_guest", "in_band", "rationale"]
+    )
     for line in plan.budget.lines:
         writer.writerow(
             [
                 line.label,
-                f"{line.amount_minor / (10 ** plan.budget.currency.info.decimals):.2f}",
+                f"{line.amount_minor / (10**plan.budget.currency.info.decimals):.2f}",
                 plan.budget.currency.value,
                 f"{line.pct:.2f}",
-                f"{line.per_guest_minor / (10 ** plan.budget.currency.info.decimals):.2f}",
+                f"{line.per_guest_minor / (10**plan.budget.currency.info.decimals):.2f}",
                 "yes" if line.in_band else "no",
                 line.rationale,
             ]
@@ -283,7 +282,7 @@ def budget_csv(plan: Plan) -> str:
     writer.writerow(
         [
             "Contingency",
-            f"{plan.budget.contingency_minor / (10 ** plan.budget.currency.info.decimals):.2f}",
+            f"{plan.budget.contingency_minor / (10**plan.budget.currency.info.decimals):.2f}",
             plan.budget.currency.value,
             f"{plan.budget.contingency_pct:.2f}",
             "",
@@ -299,7 +298,17 @@ def timeline_csv(plan: Plan) -> str:
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(
-        ["due", "task", "owner", "phase", "duration_days", "slack_days", "critical", "depends_on", "status"]
+        [
+            "due",
+            "task",
+            "owner",
+            "phase",
+            "duration_days",
+            "slack_days",
+            "critical",
+            "depends_on",
+            "status",
+        ]
     )
     for task in plan.timeline.tasks:
         writer.writerow(
@@ -328,7 +337,18 @@ def vendor_csv(plan: Plan) -> str:
     for item in plan.vendors.items:
         payments = [m for m in plan.vendors.milestones if m.vendor_key == item.key]
         if not payments:
-            writer.writerow([item.label, item.priority.value, item.book_by.isoformat(), item.deposit_pct, "", "", "", ""])
+            writer.writerow(
+                [
+                    item.label,
+                    item.priority.value,
+                    item.book_by.isoformat(),
+                    item.deposit_pct,
+                    "",
+                    "",
+                    "",
+                    "",
+                ]
+            )
             continue
         for index, milestone in enumerate(payments):
             writer.writerow(
@@ -340,7 +360,7 @@ def vendor_csv(plan: Plan) -> str:
                     milestone.label,
                     milestone.due.isoformat(),
                     milestone.pct,
-                    f"{milestone.amount_minor / (10 ** plan.budget.currency.info.decimals):.2f}",
+                    f"{milestone.amount_minor / (10**plan.budget.currency.info.decimals):.2f}",
                 ]
             )
     return buffer.getvalue()
@@ -352,11 +372,7 @@ def vendor_csv(plan: Plan) -> str:
 def _ics_escape(text: str) -> str:
     """Escape a text value per RFC 5545 section 3.3.11."""
     return (
-        str(text)
-        .replace("\\", "\\\\")
-        .replace("\n", "\\n")
-        .replace(",", "\\,")
-        .replace(";", "\\;")
+        str(text).replace("\\", "\\\\").replace("\n", "\\n").replace(",", "\\,").replace(";", "\\;")
     )
 
 

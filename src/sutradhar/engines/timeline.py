@@ -188,7 +188,10 @@ def _schedule(profile: EventTypeProfile, ctx: CostContext) -> TimelinePlan:
     # The dependency floor: the least time the work itself can take, ignoring
     # the catalogue's ideal spread. This is the real "can this be done at all?"
     # threshold - a plan can be compacted to it, but never below it.
-    floor = sum(scheduler.duration[task_id] for task_id in critical_path(scheduler.order, scheduler.duration))
+    floor = sum(
+        scheduler.duration[task_id]
+        for task_id in critical_path(scheduler.order, scheduler.duration)
+    )
 
     compacted_from: int | None = None
     if ctx.lead_days < ideal_required and ctx.lead_days > floor > 0:
@@ -196,11 +199,13 @@ def _schedule(profile: EventTypeProfile, ctx: CostContext) -> TimelinePlan:
         # window that actually exists, while dependencies keep the order intact.
         scale = ctx.lead_days / ideal_required
         scheduler = _Scheduler(
-            tuple(replace(spec, offset_days=round(spec.offset_days * scale)) for spec in profile.tasks)
+            tuple(
+                replace(spec, offset_days=round(spec.offset_days * scale)) for spec in profile.tasks
+            )
         )
         compacted_from = ideal_required
 
-    es, ef, ls, _lf = scheduler.run()
+    es, _ef, ls, _lf = scheduler.run()
 
     # Compression budget: never loop more times than there is duration to remove.
     guard = sum(spec.duration_days for spec in profile.tasks)
@@ -217,7 +222,7 @@ def _schedule(profile: EventTypeProfile, ctx: CostContext) -> TimelinePlan:
             break
         scheduler.duration[target] -= 1
         scheduler.compressed.add(target)
-        es, ef, ls, _lf = scheduler.run()
+        es, _ef, ls, _lf = scheduler.run()
 
     slack = scheduler.slack(es, ls)
     required_lead = -min(es.values())

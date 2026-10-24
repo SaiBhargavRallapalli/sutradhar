@@ -21,13 +21,13 @@ import re
 from ..exceptions import AIGuardrailError
 
 __all__ = [
-    "contains_injection",
-    "screen_input",
-    "sanitize_model_text",
-    "redact",
-    "USER_DATA_OPEN",
-    "USER_DATA_CLOSE",
     "DEFAULT_MAX_INPUT_CHARS",
+    "USER_DATA_CLOSE",
+    "USER_DATA_OPEN",
+    "contains_injection",
+    "redact",
+    "sanitize_model_text",
+    "screen_input",
 ]
 
 #: Delimiters marking the untrusted-data region of a prompt.

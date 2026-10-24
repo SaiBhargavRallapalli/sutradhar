@@ -1,1 +1,1 @@
-"""Sutradhar server package — a hardened, dependency-free HTTP interface."""
+"""Hardened WSGI interface served by one exact-pinned production dependency."""

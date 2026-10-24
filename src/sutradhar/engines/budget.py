@@ -30,7 +30,7 @@ from ..models import Brief, BudgetLine, BudgetPlan, PlanWarning, TradeOff
 from ..money import Currency, format_minor
 from .context import CostContext, cost_context
 
-__all__ = ["allocate_budget", "bounded_shares", "allocate_minor", "TRIM_FRACTION"]
+__all__ = ["TRIM_FRACTION", "allocate_budget", "allocate_minor", "bounded_shares"]
 
 #: Fraction of a category we assume a realistic trim could free up.
 TRIM_FRACTION = 0.15
@@ -193,7 +193,7 @@ def _category_weight(
     if spec.key in _METRO_SENSITIVE:
         tier_effect = 1.0 + (ctx.tier_index - 1.0) * _TIER_STRENGTH
 
-    return spec.weight * guest_effect * season_effect * tier_effect * priority.weight
+    return float(spec.weight * guest_effect * season_effect * tier_effect * priority.weight)
 
 
 # --------------------------------------------------------------------------- #
@@ -228,7 +228,7 @@ def allocate_budget(
     guests = ctx.guests
 
     contingency_pct = _contingency_pct(profile, ctx.lead_days)
-    contingency_minor = int(round(brief.budget_total_minor * contingency_pct / 100.0))
+    contingency_minor = round(brief.budget_total_minor * contingency_pct / 100.0)
     spendable_minor = brief.budget_total_minor - contingency_minor
     if spendable_minor <= 0:
         # A budget too small to hold any contingency is still plan-able.
@@ -244,11 +244,11 @@ def allocate_budget(
     lows = [spec.low_pct / 100.0 for spec in profile.categories]
     highs = [spec.high_pct / 100.0 for spec in profile.categories]
 
-    shares, feasible = bounded_shares(weights, lows, highs)
+    shares, _feasible = bounded_shares(weights, lows, highs)
     amounts = allocate_minor(spendable_minor, shares)
 
     lines: list[BudgetLine] = []
-    for spec, amount, share in zip(profile.categories, amounts, shares, strict=True):
+    for spec, amount, _share in zip(profile.categories, amounts, shares, strict=True):
         pct = (amount * 100.0 / spendable_minor) if spendable_minor else 0.0
         priority = priorities.get(spec.key, Priority.NORMAL)
         lines.append(
@@ -257,13 +257,15 @@ def allocate_budget(
                 label=spec.label,
                 amount_minor=amount,
                 pct=round(pct, 2),
-                per_guest_minor=int(round(amount / guests)),
+                per_guest_minor=round(amount / guests),
                 kind=spec.kind,
                 rationale=_rationale(spec, ctx, priority),
                 benchmark_low_pct=spec.low_pct,
                 benchmark_high_pct=spec.high_pct,
                 priority=priority,
-                in_band=(spec.low_pct - _BAND_TOLERANCE) <= pct <= (spec.high_pct + _BAND_TOLERANCE),
+                in_band=(spec.low_pct - _BAND_TOLERANCE)
+                <= pct
+                <= (spec.high_pct + _BAND_TOLERANCE),
             )
         )
 
@@ -278,7 +280,7 @@ def allocate_budget(
         spendable_minor=spendable_minor,
         contingency_minor=contingency_minor,
         allocated_minor=sum(amounts),
-        per_guest_minor=int(round(brief.budget_total_minor / guests)),
+        per_guest_minor=round(brief.budget_total_minor / guests),
         lines=tuple(lines),
         trade_offs=tuple(_trade_offs(profile, lines, priorities)),
         warnings=tuple(warnings),
@@ -320,7 +322,8 @@ def _warnings(
     out: list[PlanWarning] = []
 
     starved = [
-        line for line in lines
+        line
+        for line in lines
         if line.benchmark_low_pct > 0 and line.pct < line.benchmark_low_pct - _BAND_TOLERANCE
     ]
     if starved:
@@ -383,7 +386,7 @@ def _trade_offs(
         if spec is None or line.amount_minor <= 0:
             continue
         priority = priorities.get(line.key, line.priority)
-        saving_minor = int(round(line.amount_minor * TRIM_FRACTION))
+        saving_minor = round(line.amount_minor * TRIM_FRACTION)
         if saving_minor <= 0:
             continue
         out.append(

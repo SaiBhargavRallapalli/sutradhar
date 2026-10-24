@@ -125,7 +125,7 @@ def _coerce(value: Any, spec: FieldSpec) -> tuple[Any, str | None]:
             if isinstance(value, int):
                 return value, None
             if isinstance(value, float):
-                return int(round(value)), None
+                return round(value), None
             if isinstance(value, str):
                 match = re.search(r"-?\d+", value.replace(",", ""))
                 if match:

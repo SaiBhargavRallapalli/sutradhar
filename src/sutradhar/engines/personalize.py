@@ -18,9 +18,9 @@ from __future__ import annotations
 
 from ..catalog.specs import EventTypeProfile, ThemeSpec
 from ..enums import RiskLevel, Source
-from ..models import BudgetPlan, Brief, IdeaConcept, PlanWarning, TasteProfile
+from ..models import Brief, BudgetPlan, IdeaConcept, PlanWarning, TasteProfile
 
-__all__ = ["catalogue_ideas", "ground_concepts", "rank_themes", "concept_from_theme"]
+__all__ = ["catalogue_ideas", "concept_from_theme", "ground_concepts", "rank_themes"]
 
 #: Concepts returned by default.
 DEFAULT_IDEA_COUNT = 3
@@ -91,15 +91,15 @@ def rank_themes(
     return scored[:limit]
 
 
-def concept_from_theme(theme: ThemeSpec, budget: BudgetPlan, *, matched: set[str] | None = None) -> IdeaConcept:
+def concept_from_theme(
+    theme: ThemeSpec, budget: BudgetPlan, *, matched: set[str] | None = None
+) -> IdeaConcept:
     """Turn a catalogue theme into a budget-grounded :class:`IdeaConcept`."""
-    delta_minor = int(round(budget.total_minor * theme.delta_pct / 100.0))
+    delta_minor = round(budget.total_minor * theme.delta_pct / 100.0)
     fits, fit_note = _cost_fit(theme, delta_minor, budget)
 
     rationale = (
-        "Suggested because it matched your "
-        + ", ".join(sorted(matched))
-        + "."
+        "Suggested because it matched your " + ", ".join(sorted(matched)) + "."
         if matched
         else "A curated concept that suits this event type and budget."
     )
@@ -170,13 +170,21 @@ def ground_concepts(
     """
     out: list[IdeaConcept] = []
     for concept in concepts:
-        delta_minor = int(round(budget.total_minor * concept.estimated_delta_pct / 100.0))
+        delta_minor = round(budget.total_minor * concept.estimated_delta_pct / 100.0)
         fits, note = _cost_fit(
             ThemeSpec(
-                key=concept.key, name=concept.name, tagline=concept.tagline,
-                palette=concept.palette, decor=concept.decor, menu=concept.menu,
-                favors=concept.favors, attire=concept.attire, music=concept.music,
-                activities=concept.activities, style_keywords=(), suitable_for=(),
+                key=concept.key,
+                name=concept.name,
+                tagline=concept.tagline,
+                palette=concept.palette,
+                decor=concept.decor,
+                menu=concept.menu,
+                favors=concept.favors,
+                attire=concept.attire,
+                music=concept.music,
+                activities=concept.activities,
+                style_keywords=(),
+                suitable_for=(),
                 delta_pct=concept.estimated_delta_pct,
             ),
             delta_minor,
@@ -198,7 +206,8 @@ def ground_concepts(
                 cost_fit=note,
                 source=Source.MODEL,
                 grounded=fits,
-                rationale=concept.rationale or "Drafted by the model and re-priced against your budget.",
+                rationale=concept.rationale
+                or "Drafted by the model and re-priced against your budget.",
             )
         )
     return tuple(out)

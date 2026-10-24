@@ -13,17 +13,17 @@ many of the weddings this planner targets are budgeted in that system.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from enum import Enum
 
 __all__ = [
     "Currency",
     "CurrencyInfo",
-    "to_minor",
-    "from_minor",
-    "format_minor",
-    "parse_amount",
     "format_amount",
+    "format_minor",
+    "from_minor",
+    "parse_amount",
+    "to_minor",
 ]
 
 
@@ -54,7 +54,7 @@ class Currency(str, Enum):
         return _INFO[self.value]
 
     @classmethod
-    def parse(cls, value: str) -> "Currency":
+    def parse(cls, value: str) -> Currency:
         """Parse a currency, accepting codes *and* symbols, case-insensitively.
 
         ``"INR"``, ``"inr"`` and ``"₹"`` all resolve to :attr:`Currency.INR`.
@@ -90,7 +90,7 @@ _INFO: dict[str, CurrencyInfo] = {
 
 
 def _factor(currency: Currency) -> int:
-    return 10 ** currency.info.decimals
+    return int(10**currency.info.decimals)
 
 
 def to_minor(amount: float | int | str | Decimal, currency: Currency) -> int:
@@ -153,7 +153,9 @@ def format_minor(minor: int, currency: Currency, *, with_symbol: bool = True) ->
     return f"{sign}{prefix}{body}"
 
 
-def format_amount(amount: float | int | str, currency: Currency, *, with_symbol: bool = True) -> str:
+def format_amount(
+    amount: float | int | str, currency: Currency, *, with_symbol: bool = True
+) -> str:
     """Convenience wrapper: parse a major-unit amount and format it."""
     return format_minor(to_minor(amount, currency), currency, with_symbol=with_symbol)
 

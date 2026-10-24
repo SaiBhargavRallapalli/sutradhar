@@ -5,6 +5,7 @@ assigned, and the line items reconcile to the spendable total with zero drift.
 These tests hold that claim to account across many shapes of input, because a
 budget that is only nearly right is worse than useless.
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -13,9 +14,8 @@ import pytest
 
 from sutradhar import Brief, CityTier, Currency, EventType, Priority
 from sutradhar.catalog.registry import get_profile
-from sutradhar.catalog.specs import CategorySpec, EventTypeProfile
 from sutradhar.engines.budget import allocate_budget, allocate_minor, bounded_shares
-from sutradhar.enums import CategoryKind, Season
+from sutradhar.enums import Season
 from sutradhar.models import BriefError
 
 PROFILE = get_profile(EventType.WEDDING)
@@ -37,28 +37,40 @@ def _brief(total: int, guests: int = 200, **kwargs) -> Brief:
 class TestExactness:
     @pytest.mark.parametrize("total", [1_00, 12_345, 99_999, 1_500_000_00, 999_999_99])
     def test_lines_sum_to_spendable_exactly(self, total: int) -> None:
-        plan = allocate_budget(_brief(total), PROFILE, Season.OFF_PEAK,
-                               currency=Currency.INR, today=date(2026, 1, 1))
+        plan = allocate_budget(
+            _brief(total), PROFILE, Season.OFF_PEAK, currency=Currency.INR, today=date(2026, 1, 1)
+        )
         assert plan.unallocated_minor == 0
         assert sum(line.amount_minor for line in plan.lines) == plan.spendable_minor
 
     def test_spendable_plus_contingency_equals_total(self) -> None:
-        plan = allocate_budget(_brief(1_500_000_00), PROFILE, Season.OFF_PEAK,
-                               currency=Currency.INR, today=date(2026, 1, 1))
+        plan = allocate_budget(
+            _brief(1_500_000_00),
+            PROFILE,
+            Season.OFF_PEAK,
+            currency=Currency.INR,
+            today=date(2026, 1, 1),
+        )
         assert plan.spendable_minor + plan.contingency_minor == plan.total_minor
         assert plan.total_committed_minor == plan.total_minor
 
     @pytest.mark.parametrize("total", [1, 7, 101, 10_000])
     def test_awkward_totals_never_leave_a_rupee_unassigned(self, total: int) -> None:
         """Small and prime-ish totals are where largest-remainder usually slips."""
-        plan = allocate_budget(_brief(total, guests=1), PROFILE, Season.OFF_PEAK,
-                               currency=Currency.INR, today=date(2026, 1, 1))
+        plan = allocate_budget(
+            _brief(total, guests=1),
+            PROFILE,
+            Season.OFF_PEAK,
+            currency=Currency.INR,
+            today=date(2026, 1, 1),
+        )
         assert plan.unallocated_minor == 0
         assert all(line.amount_minor >= 0 for line in plan.lines)
 
     def test_negative_and_zero_never_produced(self) -> None:
-        plan = allocate_budget(_brief(5_00), PROFILE, Season.PEAK,
-                               currency=Currency.INR, today=date(2026, 1, 1))
+        plan = allocate_budget(
+            _brief(5_00), PROFILE, Season.PEAK, currency=Currency.INR, today=date(2026, 1, 1)
+        )
         assert all(line.amount_minor >= 0 for line in plan.lines)
 
 
@@ -136,11 +148,15 @@ class TestBoundedShares:
 class TestWeighting:
     def test_priority_moves_money_toward_the_chosen_category(self) -> None:
         today = date(2026, 1, 1)
-        base = allocate_budget(_brief(1_500_000_00), PROFILE, Season.OFF_PEAK,
-                               currency=Currency.INR, today=today)
+        base = allocate_budget(
+            _brief(1_500_000_00), PROFILE, Season.OFF_PEAK, currency=Currency.INR, today=today
+        )
         boosted = allocate_budget(
             _brief(1_500_000_00, priorities={"catering": Priority.VITAL}),
-            PROFILE, Season.OFF_PEAK, currency=Currency.INR, today=today,
+            PROFILE,
+            Season.OFF_PEAK,
+            currency=Currency.INR,
+            today=today,
         )
         base_catering = base.line("catering").amount_minor
         boosted_catering = boosted.line("catering").amount_minor
@@ -151,36 +167,59 @@ class TestWeighting:
 
     def test_peak_season_costs_more_than_off_peak_for_demand_sensitive_lines(self) -> None:
         today = date(2026, 1, 1)
-        off = allocate_budget(_brief(1_500_000_00), PROFILE, Season.OFF_PEAK,
-                              currency=Currency.INR, today=today)
-        peak = allocate_budget(_brief(1_500_000_00), PROFILE, Season.PEAK,
-                               currency=Currency.INR, today=today)
+        off = allocate_budget(
+            _brief(1_500_000_00), PROFILE, Season.OFF_PEAK, currency=Currency.INR, today=today
+        )
+        peak = allocate_budget(
+            _brief(1_500_000_00), PROFILE, Season.PEAK, currency=Currency.INR, today=today
+        )
         # Same envelope, but peak carries a bigger contingency cushion.
         assert peak.contingency_minor >= off.contingency_minor
 
     def test_tight_lead_time_increases_contingency(self) -> None:
         """A host with six weeks cannot shop around, so needs a bigger float."""
         far = allocate_budget(
-            _brief(1_500_000_00), PROFILE, Season.OFF_PEAK,
-            currency=Currency.INR, today=date(2026, 1, 1),  # ~17 months out
+            _brief(1_500_000_00),
+            PROFILE,
+            Season.OFF_PEAK,
+            currency=Currency.INR,
+            today=date(2026, 1, 1),  # ~17 months out
         )
         near = allocate_budget(
-            _brief(1_500_000_00), PROFILE, Season.OFF_PEAK,
-            currency=Currency.INR, today=date(2027, 5, 1),  # ~5 weeks out
+            _brief(1_500_000_00),
+            PROFILE,
+            Season.OFF_PEAK,
+            currency=Currency.INR,
+            today=date(2027, 5, 1),  # ~5 weeks out
         )
         assert near.contingency_pct > far.contingency_pct
 
     def test_contingency_stays_within_its_guard_rails(self) -> None:
-        plan = allocate_budget(_brief(1_500_000_00), PROFILE, Season.OFF_PEAK,
-                               currency=Currency.INR, today=date(2026, 1, 1))
+        plan = allocate_budget(
+            _brief(1_500_000_00),
+            PROFILE,
+            Season.OFF_PEAK,
+            currency=Currency.INR,
+            today=date(2026, 1, 1),
+        )
         assert 3.0 <= plan.contingency_pct <= 15.0
 
     def test_tier_affects_metro_sensitive_categories(self) -> None:
         today = date(2026, 1, 1)
-        tier3 = allocate_budget(_brief(1_500_000_00, city_tier=CityTier.TIER_3),
-                                PROFILE, Season.OFF_PEAK, currency=Currency.INR, today=today)
-        metro = allocate_budget(_brief(1_500_000_00, city_tier=CityTier.GLOBAL),
-                                PROFILE, Season.OFF_PEAK, currency=Currency.INR, today=today)
+        tier3 = allocate_budget(
+            _brief(1_500_000_00, city_tier=CityTier.TIER_3),
+            PROFILE,
+            Season.OFF_PEAK,
+            currency=Currency.INR,
+            today=today,
+        )
+        metro = allocate_budget(
+            _brief(1_500_000_00, city_tier=CityTier.GLOBAL),
+            PROFILE,
+            Season.OFF_PEAK,
+            currency=Currency.INR,
+            today=today,
+        )
         # Venue is metro-sensitive, so it claims more of the same envelope.
         assert metro.line("venue").pct > tier3.line("venue").pct
 
@@ -190,30 +229,55 @@ class TestWeighting:
 # --------------------------------------------------------------------------- #
 class TestOutputContract:
     def test_per_guest_is_consistent_with_the_line(self) -> None:
-        plan = allocate_budget(_brief(1_500_000_00, guests=250), PROFILE, Season.OFF_PEAK,
-                               currency=Currency.INR, today=date(2026, 1, 1))
+        plan = allocate_budget(
+            _brief(1_500_000_00, guests=250),
+            PROFILE,
+            Season.OFF_PEAK,
+            currency=Currency.INR,
+            today=date(2026, 1, 1),
+        )
         for line in plan.lines:
             assert line.per_guest_minor == round(line.amount_minor / 250)
 
     def test_every_catalogue_category_is_present(self) -> None:
-        plan = allocate_budget(_brief(1_500_000_00), PROFILE, Season.OFF_PEAK,
-                               currency=Currency.INR, today=date(2026, 1, 1))
+        plan = allocate_budget(
+            _brief(1_500_000_00),
+            PROFILE,
+            Season.OFF_PEAK,
+            currency=Currency.INR,
+            today=date(2026, 1, 1),
+        )
         assert {line.key for line in plan.lines} == {spec.key for spec in PROFILE.categories}
 
     def test_lines_are_sorted_largest_first(self) -> None:
-        plan = allocate_budget(_brief(1_500_000_00), PROFILE, Season.OFF_PEAK,
-                               currency=Currency.INR, today=date(2026, 1, 1))
+        plan = allocate_budget(
+            _brief(1_500_000_00),
+            PROFILE,
+            Season.OFF_PEAK,
+            currency=Currency.INR,
+            today=date(2026, 1, 1),
+        )
         amounts = [line.amount_minor for line in plan.lines]
         assert amounts == sorted(amounts, reverse=True)
 
     def test_pcts_add_up_to_a_hundred(self) -> None:
-        plan = allocate_budget(_brief(1_500_000_00), PROFILE, Season.OFF_PEAK,
-                               currency=Currency.INR, today=date(2026, 1, 1))
+        plan = allocate_budget(
+            _brief(1_500_000_00),
+            PROFILE,
+            Season.OFF_PEAK,
+            currency=Currency.INR,
+            today=date(2026, 1, 1),
+        )
         assert sum(line.pct for line in plan.lines) == pytest.approx(100.0, abs=0.5)
 
     def test_trade_offs_carry_a_real_saving_and_a_consequence(self) -> None:
-        plan = allocate_budget(_brief(1_500_000_00), PROFILE, Season.OFF_PEAK,
-                               currency=Currency.INR, today=date(2026, 1, 1))
+        plan = allocate_budget(
+            _brief(1_500_000_00),
+            PROFILE,
+            Season.OFF_PEAK,
+            currency=Currency.INR,
+            today=date(2026, 1, 1),
+        )
         assert plan.trade_offs, "a budget this size should always offer trade-offs"
         for t in plan.trade_offs:
             assert t.saving_minor > 0
@@ -221,7 +285,7 @@ class TestOutputContract:
 
     def test_is_deterministic(self) -> None:
         args = (_brief(1_500_000_00), PROFILE, Season.OFF_PEAK)
-        kwargs = dict(currency=Currency.INR, today=date(2026, 1, 1))
+        kwargs = {"currency": Currency.INR, "today": date(2026, 1, 1)}
         a = allocate_budget(*args, **kwargs)
         b = allocate_budget(*args, **kwargs)
         assert [ln.amount_minor for ln in a.lines] == [ln.amount_minor for ln in b.lines]

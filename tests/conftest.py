@@ -4,6 +4,7 @@ Every test that touches planning passes an explicit ``today`` so results are
 byte-for-byte reproducible; nothing in this suite should depend on the day it
 happens to run.
 """
+
 from __future__ import annotations
 
 from datetime import date

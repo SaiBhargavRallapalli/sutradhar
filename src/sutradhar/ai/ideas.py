@@ -13,6 +13,7 @@ budget-grounded set of ideas - they just come from the catalogue instead.
 from __future__ import annotations
 
 import re
+import time
 from dataclasses import dataclass
 
 from ..catalog.specs import EventTypeProfile
@@ -20,13 +21,13 @@ from ..config import Settings
 from ..engines.personalize import catalogue_ideas, ground_concepts, idea_warnings
 from ..enums import RiskLevel
 from ..exceptions import AIGuardrailError, AIProviderError, AISchemaError
-from ..models import BudgetPlan, Brief, IdeaConcept, PlanWarning
+from ..models import Brief, BudgetPlan, IdeaConcept, PlanWarning
 from .guardrails import sanitize_model_text, screen_input
 from .prompts import IDEAS_SYSTEM, build_ideas_user, build_repair_user
 from .provider import Provider
 from .schema import FieldSpec, ObjectSpec, extract_json, validate_object
 
-__all__ = ["IdeaResult", "generate_ideas", "IDEAS_SPEC", "parse_ideas"]
+__all__ = ["IDEAS_SPEC", "IdeaResult", "generate_ideas", "parse_ideas"]
 
 
 #: The exact shape the system prompt promises. Kept beside the prompt so the
@@ -175,11 +176,24 @@ def generate_ideas(
 
     raw = ""
     errors: list[str] = []
+    deadline = time.monotonic() + settings.timeout
     for attempt in range(settings.max_repairs + 1):
+        remaining = deadline - time.monotonic()
+        if remaining < 1.0:
+            warnings.append(
+                PlanWarning(
+                    code="model_timeout",
+                    message="The model exhausted its total time budget; using catalogue ideas.",
+                    severity=RiskLevel.MEDIUM,
+                    section="ideas",
+                    suggestion="Try again later or continue with the complete catalogue plan.",
+                )
+            )
+            break
         prompt = user_prompt if attempt == 0 else build_repair_user(user_prompt, raw, errors)
 
         try:
-            raw = provider.complete(IDEAS_SYSTEM, prompt, temperature=0.7, timeout=settings.timeout)
+            raw = provider.complete(IDEAS_SYSTEM, prompt, temperature=0.7, timeout=remaining)
         except AIProviderError as exc:
             warnings.append(
                 PlanWarning(

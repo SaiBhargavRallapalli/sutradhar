@@ -9,8 +9,9 @@ traceback - and the web layer can map it straight onto a form control.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from datetime import date, datetime
-from typing import Any, Mapping
+from typing import Any
 
 from .enums import CityTier, EventType, Priority, Season, WindExposure
 from .exceptions import ValidationError
@@ -19,7 +20,15 @@ from .money import Currency, parse_amount
 
 __all__ = ["brief_from_dict", "brief_from_json"]
 
-_DATE_FORMATS = ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%d %b %Y", "%d %B %Y", "%b %d %Y", "%B %d, %Y")
+_DATE_FORMATS = (
+    "%Y-%m-%d",
+    "%d/%m/%Y",
+    "%d-%m-%Y",
+    "%d %b %Y",
+    "%d %B %Y",
+    "%b %d %Y",
+    "%B %d, %Y",
+)
 
 
 def _parse_date(value: Any, field: str) -> date:
@@ -31,7 +40,7 @@ def _parse_date(value: Any, field: str) -> date:
     if isinstance(value, (int, float)):
         # A timestamp in milliseconds or seconds.
         seconds = float(value) / 1000 if value > 1e11 else float(value)
-        return datetime.utcfromtimestamp(seconds).date()  # noqa: DTZ003 - caller-supplied epoch
+        return datetime.utcfromtimestamp(seconds).date()
     text = str(value or "").strip()
     if not text:
         raise ValidationError(field, "a date is required (YYYY-MM-DD)")
@@ -43,9 +52,7 @@ def _parse_date(value: Any, field: str) -> date:
     try:
         return datetime.fromisoformat(text).date()
     except ValueError as exc:
-        raise ValidationError(
-            field, f"could not read {text!r} as a date; try YYYY-MM-DD"
-        ) from exc
+        raise ValidationError(field, f"could not read {text!r} as a date; try YYYY-MM-DD") from exc
 
 
 def _parse_enum(enum_cls: Any, value: Any, field: str) -> Any:
@@ -93,7 +100,9 @@ def _parse_priorities(raw: Any) -> dict[str, Priority]:
     if raw is None:
         return {}
     if not isinstance(raw, Mapping):
-        raise ValidationError("priorities", "must map a budget category key to low/normal/high/vital")
+        raise ValidationError(
+            "priorities", "must map a budget category key to low/normal/high/vital"
+        )
     out: dict[str, Priority] = {}
     for key, value in raw.items():
         out[str(key).strip().lower()] = _parse_enum(Priority, value, f"priorities.{key}")
@@ -111,9 +120,7 @@ def brief_from_dict(data: Mapping[str, Any]) -> Brief:
         raise ValidationError("brief", "expected an object describing the event")
 
     event_type = _parse_enum(EventType, data.get("event_type") or data.get("type"), "event_type")
-    event_date = _parse_date(
-        data.get("event_date") or data.get("date"), "event_date"
-    )
+    event_date = _parse_date(data.get("event_date") or data.get("date"), "event_date")
 
     guests_raw = data.get("guest_count", data.get("guests", data.get("headcount")))
     try:
@@ -125,7 +132,9 @@ def brief_from_dict(data: Mapping[str, Any]) -> Brief:
         Currency, data.get("currency") or data.get("currency_code") or "INR", "currency"
     )
 
-    budget_raw = data.get("budget_total_minor", data.get("budget", data.get("budget_total", data.get("total"))))
+    budget_raw = data.get(
+        "budget_total_minor", data.get("budget", data.get("budget_total", data.get("total")))
+    )
     if budget_raw is None:
         raise ValidationError("budget", "a total budget is required")
     try:
@@ -153,7 +162,9 @@ def brief_from_dict(data: Mapping[str, Any]) -> Brief:
         guest_count=guest_count,
         budget_total_minor=budget_minor,
         currency=currency,
-        city_tier=_parse_enum(CityTier, data.get("city_tier") or CityTier.TIER_1.value, "city_tier"),
+        city_tier=_parse_enum(
+            CityTier, data.get("city_tier") or CityTier.TIER_1.value, "city_tier"
+        ),
         location=str(data.get("location") or "").strip()[:120],
         title=str(data.get("title") or "").strip()[:120],
         host_name=str(data.get("host_name") or data.get("host") or "").strip()[:80],
@@ -162,7 +173,9 @@ def brief_from_dict(data: Mapping[str, Any]) -> Brief:
         priorities=_parse_priorities(data.get("priorities")),
         taste=_parse_taste(data.get("taste")),
         notes=str(data.get("notes") or "").strip()[:2000],
-        natural_language=str(data.get("natural_language") or data.get("request") or "").strip()[:4000],
+        natural_language=str(data.get("natural_language") or data.get("request") or "").strip()[
+            :4000
+        ],
     )
     brief.validate()
     return brief

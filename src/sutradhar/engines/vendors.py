@@ -13,10 +13,10 @@ Two things make this engine more than a static checklist:
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 
 from ..catalog.specs import EventTypeProfile
-from ..enums import EventType, Priority, RiskLevel
+from ..enums import EventType, Priority, RiskLevel, Season
 from ..models import Brief, PaymentMilestone, PlanWarning, VendorItem, VendorPlan
 from .budget import allocate_minor
 from .context import CostContext, cost_context
@@ -30,26 +30,46 @@ __all__ = ["build_vendors"]
 #: reconcile against the budget exactly.
 _VENDOR_BUDGET_MAP: dict[EventType, dict[str, str]] = {
     EventType.WEDDING: {
-        "venue": "venue", "caterer": "catering", "decorator": "decor",
-        "photographer": "photography", "makeup": "beauty", "dj": "entertainment",
-        "invitations": "invites", "transport": "transport",
+        "venue": "venue",
+        "caterer": "catering",
+        "decorator": "decor",
+        "photographer": "photography",
+        "makeup": "beauty",
+        "dj": "entertainment",
+        "invitations": "invites",
+        "transport": "transport",
     },
     EventType.BIRTHDAY: {
-        "venue": "venue", "caterer": "food", "entertainer": "activities",
-        "decorator": "decor", "photographer": "photography", "invitations": "invites",
+        "venue": "venue",
+        "caterer": "food",
+        "entertainer": "activities",
+        "decorator": "decor",
+        "photographer": "photography",
+        "invitations": "invites",
     },
     EventType.COMMUNITY: {
-        "venue": "venue", "av": "production", "catering": "food",
-        "insurance": "safety", "printing": "outreach", "sanitation": "logistics",
-        "security": "logistics", "accessibility": "accessibility",
+        "venue": "venue",
+        "av": "production",
+        "catering": "food",
+        "insurance": "safety",
+        "printing": "outreach",
+        "sanitation": "logistics",
+        "security": "logistics",
+        "accessibility": "accessibility",
     },
     EventType.HOUSEWARMING: {
-        "caterer": "food", "cleaning": "home_prep", "rentals": "hospitality",
-        "florist": "decor", "music": "entertainment",
+        "caterer": "food",
+        "cleaning": "home_prep",
+        "rentals": "hospitality",
+        "florist": "decor",
+        "music": "entertainment",
     },
     EventType.ANNIVERSARY: {
-        "venue": "venue", "caterer": "food", "florist": "decor",
-        "photographer": "photography", "music": "entertainment",
+        "venue": "venue",
+        "caterer": "food",
+        "florist": "decor",
+        "photographer": "photography",
+        "music": "entertainment",
     },
 }
 
@@ -64,7 +84,7 @@ _PROGRESS_PCT = 30.0
 def build_vendors(
     brief: Brief,
     profile: EventTypeProfile,
-    season,  # type: ignore[explicit-override]
+    season: Season,
     *,
     budget_amounts: dict[str, int],
     today: date | None = None,
@@ -101,13 +121,18 @@ def build_vendors(
             )
         )
         milestones.extend(
-            _milestones_for(spec.key, spec.deposit_pct, book_by, ctx.event_date,
-                            budget_amounts.get(mapping.get(spec.key, ""), 0))
+            _milestones_for(
+                spec.key,
+                spec.deposit_pct,
+                book_by,
+                ctx.event_date,
+                budget_amounts.get(mapping.get(spec.key, ""), 0),
+            )
         )
 
     milestones.sort(key=lambda m: (m.due, m.vendor_key, m.label))
 
-    warnings = _warnings(ctx, profile, items, milestones)
+    _warnings(ctx, profile, items, milestones)
     return VendorPlan(
         items=tuple(items),
         milestones=tuple(milestones),
@@ -135,9 +160,19 @@ def _milestones_for(
 
     plan: list[tuple[str, date, float]] = [("Booking advance", book_by, deposit)]
     if progress:
-        plan.append(("Progress payment", date.fromordinal(event_date.toordinal() - _PROGRESS_OFFSET_DAYS), progress))
+        plan.append(
+            (
+                "Progress payment",
+                date.fromordinal(event_date.toordinal() - _PROGRESS_OFFSET_DAYS),
+                progress,
+            )
+        )
     plan.append(
-        ("Balance before the event", date.fromordinal(event_date.toordinal() - _BALANCE_OFFSET_DAYS), balance)
+        (
+            "Balance before the event",
+            date.fromordinal(event_date.toordinal() - _BALANCE_OFFSET_DAYS),
+            balance,
+        )
     )
 
     weights = [pct for _, _, pct in plan]
@@ -179,8 +214,11 @@ def _warnings(
             )
         )
 
-    late_bookers = [item for item in items if item.priority in (Priority.HIGH, Priority.VITAL)
-                    and item.book_by < ctx.today]
+    late_bookers = [
+        item
+        for item in items
+        if item.priority in (Priority.HIGH, Priority.VITAL) and item.book_by < ctx.today
+    ]
     if late_bookers:
         names = ", ".join(item.label for item in late_bookers[:3])
         out.append(

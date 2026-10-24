@@ -34,7 +34,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-__all__ = ["to_plain", "with_computed", "dumps"]
+__all__ = ["dumps", "to_plain", "with_computed"]
 
 
 def _is_dataclass_instance(obj: Any) -> bool:

@@ -13,7 +13,7 @@ from __future__ import annotations
 from datetime import date
 
 from ..catalog.specs import EventTypeProfile, severity_for
-from ..enums import OwnerRole, RiskLevel, WindExposure
+from ..enums import OwnerRole, RiskLevel, Season, WindExposure
 from ..models import Brief, PlanWarning, RiskItem, RiskPlan
 from .context import CostContext, cost_context
 
@@ -29,7 +29,7 @@ _SCALE_CREEP_RATIO = 2.0
 def build_risks(
     brief: Brief,
     profile: EventTypeProfile,
-    season,  # type: ignore[explicit-override]
+    season: Season,
     *,
     today: date | None = None,
 ) -> RiskPlan:
@@ -71,20 +71,21 @@ def _contextual_pressure(
     text = f"{key} {title}".lower()
 
     is_weather = any(word in text for word in ("rain", "weather", "monsoon", "heat"))
-    if is_weather and ctx.is_outdoor and ctx.setting is WindExposure.OPEN_AIR:
-        pressure += 1
-    elif is_weather and ctx.is_outdoor:
+    if (is_weather and ctx.is_outdoor and ctx.setting is WindExposure.OPEN_AIR) or (
+        is_weather and ctx.is_outdoor
+    ):
         pressure += 1
 
-    is_availability = any(word in text for word in ("noshow", "no show", "cancel", "permit", "vendor"))
+    is_availability = any(
+        word in text for word in ("noshow", "no show", "cancel", "permit", "vendor")
+    )
     if is_availability and ctx.lead_days < profile.min_lead_days:
         pressure += 1
     if is_availability and ctx.season.value == "peak":
         pressure += 1
 
-    if "budget" in text or "overrun" in text:
-        if ctx.lead_days < 60:
-            pressure += 1
+    if ("budget" in text or "overrun" in text) and ctx.lead_days < 60:
+        pressure += 1
 
     return pressure
 

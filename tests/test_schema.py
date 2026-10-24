@@ -4,6 +4,7 @@ The model layer's contract is: whatever a model returns, we either repair it
 into the expected shape or reject it with an error a human can act on. Never
 silently accept junk, and never crash on odd-but-fixable output.
 """
+
 from __future__ import annotations
 
 import json
@@ -45,7 +46,7 @@ class TestExtractJson:
         assert extract_json('{"a": 1} - let me know if you want changes!') == {"a": 1}
 
     def test_extracts_an_array(self) -> None:
-        assert extract_json('[1, 2, 3]') == [1, 2, 3]
+        assert extract_json("[1, 2, 3]") == [1, 2, 3]
 
     def test_finds_an_array_nested_in_prose(self) -> None:
         assert extract_json('ideas below\n[{"a": 1}]') == [{"a": 1}]
@@ -122,9 +123,7 @@ class TestValidateObject:
 
     def test_rejects_a_bool_where_a_number_is_wanted(self) -> None:
         """`True` must not quietly become `1.0` - that is a type confusion."""
-        out, errors = validate_object(
-            {"name": "a", "tagline": "b", "delta_pct": True}, IDEA_SPEC
-        )
+        out, errors = validate_object({"name": "a", "tagline": "b", "delta_pct": True}, IDEA_SPEC)
         assert errors or out["delta_pct"] is None or out["delta_pct"] == 0.0
 
     def test_coerces_boolean_strings(self) -> None:
@@ -157,9 +156,7 @@ class TestValidateObject:
         assert "Marigold" in out["name"]
 
     def test_drops_unknown_keys(self) -> None:
-        out, _ = validate_object(
-            {"name": "a", "tagline": "b", "dangerous": "payload"}, IDEA_SPEC
-        )
+        out, _ = validate_object({"name": "a", "tagline": "b", "dangerous": "payload"}, IDEA_SPEC)
         assert "dangerous" not in out
 
     def test_non_object_input_is_reported_not_crashed(self) -> None:
@@ -171,7 +168,7 @@ class TestValidateObject:
         assert errors
 
     def test_empty_spec_passes_any_object_through(self) -> None:
-        out, errors = validate_object({"anything": 1}, ObjectSpec())
+        _out, errors = validate_object({"anything": 1}, ObjectSpec())
         assert errors == []
 
     def test_collects_multiple_errors_at_once(self) -> None:
@@ -190,7 +187,7 @@ class TestValidateObject:
 class TestRepairRoundTrip:
     def test_a_messy_model_response_survives_the_pipeline(self) -> None:
         """The realistic worst case: prose, a fence, wrong types, extra keys."""
-        raw = '''Here are your ideas:
+        raw = """Here are your ideas:
 
 ```json
 [
@@ -203,7 +200,7 @@ class TestRepairRoundTrip:
     "unwanted": "<script>alert(1)</script>"
   }
 ]
-```'''
+```"""
         ideas = extract_json(raw)
         assert isinstance(ideas, list)
         out, errors = validate_object(ideas[0], IDEA_SPEC)

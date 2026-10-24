@@ -21,7 +21,7 @@ from pathlib import Path
 
 from .exceptions import AIConfigError
 
-__all__ = ["Settings", "load_settings", "load_env_file", "DEFAULT_ENV_FILE"]
+__all__ = ["DEFAULT_ENV_FILE", "Settings", "load_env_file", "load_settings"]
 
 
 DEFAULT_ENV_FILE = ".env"
@@ -58,7 +58,9 @@ def load_env_file(path: str | Path = DEFAULT_ENV_FILE, *, override: bool = False
         if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
             value = value[1:-1]
         if not key.isidentifier():
-            raise AIConfigError(f"{file_path}:{lineno}: {key!r} is not a valid environment variable name")
+            raise AIConfigError(
+                f"{file_path}:{lineno}: {key!r} is not a valid environment variable name"
+            )
         if override or key not in os.environ:
             os.environ[key] = value
             applied[key] = value
@@ -102,10 +104,15 @@ class Settings:
 
     provider: str = "auto"
     ai_enabled: bool = True
-    max_repairs: int = 2
+    max_repairs: int = 1
     max_prompt_chars: int = 6000
-    timeout: float = 45.0
-    trace_provenance: bool = True
+    timeout: float = 40.0
+    ai_cache_entries: int = 128
+    ai_cache_ttl: float = 21_600.0
+    ai_daily_cap: int = 500
+    ai_breaker_threshold: int = 3
+    ai_breaker_cooldown: float = 60.0
+    trust_proxy: bool = False
 
     # OpenAI-compatible chat-completions endpoint.
     openai_api_key: str | None = field(default=None, repr=False)
@@ -128,7 +135,7 @@ class Settings:
     def has_any_provider(self) -> bool:
         return self.has_openai or self.has_gemini
 
-    def with_overrides(self, **kwargs: object) -> "Settings":
+    def with_overrides(self, **kwargs: object) -> Settings:
         """Return a copy with ``kwargs`` applied (used by the CLI ``--no-ai`` flag)."""
         return replace(self, **kwargs)  # type: ignore[arg-type]
 
@@ -163,12 +170,19 @@ def load_settings(
     return Settings(
         provider=provider,
         ai_enabled=_bool(env.get("SUTRADHAR_AI_ENABLED"), True),
-        max_repairs=_int(env.get("SUTRADHAR_AI_MAX_REPAIRS"), 2, 0, 5),
+        max_repairs=_int(env.get("SUTRADHAR_AI_MAX_REPAIRS"), 1, 0, 2),
         max_prompt_chars=_int(env.get("SUTRADHAR_AI_MAX_PROMPT_CHARS"), 6000, 500, 100_000),
-        timeout=_float(env.get("SUTRADHAR_AI_TIMEOUT"), 45.0, 5.0, 300.0),
-        trace_provenance=_bool(env.get("SUTRADHAR_TRACE_PROVENANCE"), True),
+        timeout=_float(env.get("SUTRADHAR_AI_TIMEOUT"), 40.0, 5.0, 60.0),
+        ai_cache_entries=_int(env.get("SUTRADHAR_AI_CACHE_ENTRIES"), 128, 1, 1_024),
+        ai_cache_ttl=_float(env.get("SUTRADHAR_AI_CACHE_TTL"), 21_600.0, 60.0, 86_400.0),
+        ai_daily_cap=_int(env.get("SUTRADHAR_AI_DAILY_CAP"), 500, 1, 100_000),
+        ai_breaker_threshold=_int(env.get("SUTRADHAR_AI_BREAKER_THRESHOLD"), 3, 1, 20),
+        ai_breaker_cooldown=_float(env.get("SUTRADHAR_AI_BREAKER_COOLDOWN"), 60.0, 5.0, 3_600.0),
+        trust_proxy=_bool(env.get("SUTRADHAR_TRUST_PROXY"), bool(env.get("RENDER"))),
         openai_api_key=_optional(env.get("SUTRADHAR_OPENAI_API_KEY")),
-        openai_base_url=(env.get("SUTRADHAR_OPENAI_BASE_URL") or "https://api.openai.com/v1").rstrip("/"),
+        openai_base_url=(
+            env.get("SUTRADHAR_OPENAI_BASE_URL") or "https://api.openai.com/v1"
+        ).rstrip("/"),
         openai_model=(env.get("SUTRADHAR_OPENAI_MODEL") or "gpt-4o-mini").strip(),
         gemini_api_key=_optional(env.get("SUTRADHAR_GEMINI_API_KEY")),
         gemini_model=(env.get("SUTRADHAR_GEMINI_MODEL") or "gemini-2.5-flash").strip(),

@@ -6,9 +6,9 @@ services:
     runtime: python
     region: ohio # US Central — closest to Groq + Gemini serving
     plan: free
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install --disable-pip-version-check .
     # $PORT is injected by Render; 0.0.0.0 is required (localhost is unreachable).
-    startCommand: PYTHONPATH=src python3 -m sutradhar.cli web --host 0.0.0.0 --port $PORT
+    startCommand: sutradhar web --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
     # Live-model prose via Groq. Without SUTRADHAR_OPENAI_API_KEY the app
     # runs fully offline on the curated catalogue — nothing else to change.
@@ -19,7 +19,7 @@ services:
         value: https://api.groq.com/openai/v1
       - key: SUTRADHAR_OPENAI_MODEL
         value: openai/gpt-oss-20b
+      - key: SUTRADHAR_TRUST_PROXY
+        value: "1"
       - key: SUTRADHAR_OPENAI_API_KEY
-        sync: false
-      - key: SUTRADHAR_GEMINI_API_KEY
         sync: false

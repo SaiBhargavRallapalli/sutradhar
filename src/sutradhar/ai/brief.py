@@ -104,13 +104,22 @@ def try_brief_from_text(
     except (AIProviderError, AISchemaError, ValueError) as exc:
         return None, f"Could not read that request: {exc}"
 
-    merged: dict[str, object] = {**(defaults or {}), **{k: v for k, v in fields.items() if v is not None}}
+    merged: dict[str, object] = {
+        **(defaults or {}),
+        **{k: v for k, v in fields.items() if v is not None},
+    }
     if not merged.get("event_date"):
-        return None, "I could not find a date in that request. Please add one, e.g. 'on 14 Feb 2027'."
+        return (
+            None,
+            "I could not find a date in that request. Please add one, e.g. 'on 14 Feb 2027'.",
+        )
     if not merged.get("guest_count"):
         merged["guest_count"] = 2
     if merged.get("budget") is None:
-        return None, "I could not find a budget in that request. Please add one, e.g. 'budget 25 lakh'."
+        return (
+            None,
+            "I could not find a budget in that request. Please add one, e.g. 'budget 25 lakh'.",
+        )
 
     merged["natural_language"] = text
     try:

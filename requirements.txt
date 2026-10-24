@@ -1,3 +1,2 @@
-# Sutradhar has ZERO runtime dependencies (stdlib only).
-# This file exists so Render detects a Python service;
-# `pip install -r requirements.txt` is a harmless no-op.
+# Exact-pinned production server. The planning core itself uses only stdlib.
+waitress==3.0.2

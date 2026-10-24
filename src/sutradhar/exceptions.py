@@ -8,16 +8,16 @@ and correct exit codes without ever string-matching on error text.
 from __future__ import annotations
 
 __all__ = [
-    "SutradharError",
-    "ValidationError",
-    "BriefError",
-    "TimelineError",
-    "BudgetError",
-    "CatalogError",
-    "AIProviderError",
     "AIConfigError",
     "AIGuardrailError",
+    "AIProviderError",
     "AISchemaError",
+    "BriefError",
+    "BudgetError",
+    "CatalogError",
+    "SutradharError",
+    "TimelineError",
+    "ValidationError",
 ]
 
 

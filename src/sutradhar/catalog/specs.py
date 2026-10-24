@@ -17,12 +17,12 @@ from ..enums import CategoryKind, EventType, OwnerRole, Priority, RiskLevel
 
 __all__ = [
     "CategorySpec",
-    "TaskSpec",
-    "VendorSpec",
-    "RiskSpec",
-    "ThemeSpec",
-    "RunOfShowSpec",
     "EventTypeProfile",
+    "RiskSpec",
+    "RunOfShowSpec",
+    "TaskSpec",
+    "ThemeSpec",
+    "VendorSpec",
     "risk",
     "severity_for",
 ]

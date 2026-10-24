@@ -4,6 +4,7 @@ Exports are what a host actually takes to a vendor or a printer, so the bar is
 higher than "produces text": iCalendar must be RFC 5545-shaped and foldable,
 CSV must round-trip through a real parser, and Markdown must be complete.
 """
+
 from __future__ import annotations
 
 import csv
@@ -13,15 +14,15 @@ from datetime import date
 
 import pytest
 
-from sutradhar.models import Plan
 from sutradhar.export import (
     budget_csv,
+    timeline_csv,
     to_ics,
     to_markdown,
-    timeline_csv,
     vendor_csv,
     write_plan,
 )
+from sutradhar.models import Plan
 
 
 class TestMarkdown:
@@ -56,9 +57,14 @@ class TestMarkdown:
 
 
 class TestCsv:
-    @pytest.mark.parametrize("renderer,min_rows", [
-        (budget_csv, 1), (timeline_csv, 1), (vendor_csv, 1),
-    ])
+    @pytest.mark.parametrize(
+        "renderer,min_rows",
+        [
+            (budget_csv, 1),
+            (timeline_csv, 1),
+            (vendor_csv, 1),
+        ],
+    )
     def test_parses_with_the_stdlib_csv_reader(self, plan: Plan, renderer, min_rows: int) -> None:
         rows = list(csv.reader(io.StringIO(renderer(plan))))
         assert len(rows) > min_rows
