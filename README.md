@@ -238,7 +238,7 @@ Everything works with **zero configuration**. To enable model prose, copy
 |---|---|---|
 | `SUTRADHAR_PROVIDER` | `auto` | `auto` (first configured key, else offline catalogue), `openai`, `gemini`, `mock` |
 | `SUTRADHAR_OPENAI_API_KEY` / `_BASE_URL` / `_MODEL` | — / `api.openai.com/v1` / `gpt-4o-mini` | OpenAI-compatible `POST /chat/completions` — also covers Groq, Together, OpenRouter, Mistral, LM Studio, llama.cpp, vLLM, Ollama `/v1` |
-| `SUTRADHAR_GEMINI_API_KEY` / `_MODEL` | — / `gemini-2.0-flash` | Gemini `generateContent` endpoint |
+| `SUTRADHAR_GEMINI_API_KEY` / `_MODEL` | — / `gemini-2.5-flash` | Gemini `generateContent` endpoint |
 | `SUTRADHAR_AI_ENABLED` | `1` | `0` = pure deterministic planning, no outbound calls ever |
 | `SUTRADHAR_AI_MAX_REPAIRS` | `2` | Repair attempts on malformed model JSON (clamped 0–5) |
 | `SUTRADHAR_AI_MAX_PROMPT_CHARS` | `6000` | Hard ceiling on outbound prompt size |

@@ -4,6 +4,7 @@ services:
   - type: web
     name: sutradhar
     runtime: python
+    region: ohio # US Central — closest to Gemini's us-central1 serving
     plan: free
     buildCommand: pip install -r requirements.txt
     # $PORT is injected by Render; 0.0.0.0 is required (localhost is unreachable).

@@ -114,7 +114,7 @@ class Settings:
 
     # Google Gemini generateContent endpoint.
     gemini_api_key: str | None = field(default=None, repr=False)
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-2.5-flash"
 
     @property
     def has_openai(self) -> bool:
@@ -171,5 +171,5 @@ def load_settings(
         openai_base_url=(env.get("SUTRADHAR_OPENAI_BASE_URL") or "https://api.openai.com/v1").rstrip("/"),
         openai_model=(env.get("SUTRADHAR_OPENAI_MODEL") or "gpt-4o-mini").strip(),
         gemini_api_key=_optional(env.get("SUTRADHAR_GEMINI_API_KEY")),
-        gemini_model=(env.get("SUTRADHAR_GEMINI_MODEL") or "gemini-2.0-flash").strip(),
+        gemini_model=(env.get("SUTRADHAR_GEMINI_MODEL") or "gemini-2.5-flash").strip(),
     )
