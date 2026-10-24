@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sutradhar — celebration &amp; event planner</title>
+<meta name="description" content="Plan a wedding, birthday or community event: an exact budget, a critical-path timeline, vendor checklists and personalised ideas.">
+<meta name="color-scheme" content="light dark">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E0%A5%B8%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to the planner</a>
+
+<header class="site-header">
+  <div class="wrap">
+    <h1><span aria-hidden="true">सू</span> Sutradhar</h1>
+    <p class="tagline">The thread-holder: one plan that ties your budget, your dates, your vendors and your ideas together.</p>
+    <p class="mode" id="mode-line" aria-live="polite"></p>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+
+  <!-- ============================ FORM ============================ -->
+  <section aria-labelledby="form-heading">
+    <h2 id="form-heading">Tell us about the event</h2>
+
+    <form id="plan-form" novalidate>
+      <!-- Fieldsets keep every group programmatically associated with its
+           legend, which is what screen readers announce on entry. -->
+      <fieldset>
+        <legend>The basics</legend>
+
+        <div class="grid">
+          <p class="field">
+            <label for="event_type">Event type</label>
+            <select id="event_type" name="event_type" required aria-describedby="event_type-hint">
+              <option value="wedding">Wedding</option>
+              <option value="birthday">Birthday</option>
+              <option value="community">Community event</option>
+              <option value="housewarming">Housewarming</option>
+              <option value="anniversary">Anniversary</option>
+            </select>
+            <span class="hint" id="event_type-hint">Each type has its own budget benchmarks, tasks and vendor list.</span>
+          </p>
+
+          <p class="field">
+            <label for="title">Name for the plan</label>
+            <input id="title" name="title" type="text" maxlength="120" autocomplete="off" placeholder="Aarav &amp; Meera">
+          </p>
+
+          <p class="field">
+            <label for="event_date">Date</label>
+            <input id="event_date" name="event_date" type="date" required aria-describedby="event_date-hint">
+            <span class="hint" id="event_date-hint">How much runway you have decides which tasks are possible.</span>
+          </p>
+
+          <p class="field">
+            <label for="guest_count">Guests</label>
+            <input id="guest_count" name="guest_count" type="number" min="1" max="100000" step="1" value="150" required inputmode="numeric">
+          </p>
+
+          <p class="field">
+            <label for="budget">Total budget</label>
+            <input id="budget" name="budget" type="text" inputmode="decimal" value="800000" required aria-describedby="budget-hint">
+            <span class="hint" id="budget-hint">Whole currency units. Try “15 lakh”, “25000”, or “$3000”.</span>
+          </p>
+
+          <p class="field">
+            <label for="currency">Currency</label>
+            <select id="currency" name="currency">
+              <option value="INR" selected>INR — ₹</option>
+              <option value="USD">USD — $</option>
+              <option value="EUR">EUR — €</option>
+              <option value="GBP">GBP — £</option>
+              <option value="AED">AED</option>
+              <option value="SGD">SGD — S$</option>
+              <option value="AUD">AUD — A$</option>
+              <option value="JPY">JPY — ¥</option>
+            </select>
+          </p>
+
+          <p class="field">
+            <label for="location">City</label>
+            <input id="location" name="location" type="text" maxlength="120" autocomplete="address-level2" placeholder="Pune">
+          </p>
+
+          <p class="field">
+            <label for="city_tier">City tier</label>
+            <select id="city_tier" name="city_tier">
+              <option value="tier_1">Tier 1 (metro)</option>
+              <option value="tier_2" selected>Tier 2</option>
+              <option value="tier_3">Tier 3</option>
+              <option value="global">International</option>
+            </select>
+          </p>
+
+          <p class="field">
+            <label for="setting">Indoor or outdoor</label>
+            <select id="setting" name="setting">
+              <option value="indoor">Indoor</option>
+              <option value="sheltered">Sheltered outdoor</option>
+              <option value="open_air" selected>Open air</option>
+            </select>
+          </p>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>What matters most to you</legend>
+        <p class="hint" id="priorities-hint">Raise a category and the allocator moves money toward it, and tells you what it moved.</p>
+        <div class="grid priorities" role="group" aria-describedby="priorities-hint">
+          <p class="field">
+            <label for="p_catering">Catering</label>
+            <select id="p_catering" class="priority" data-cat="catering">
+              <option value="low">Low</option><option value="normal" selected>Normal</option>
+              <option value="high">High</option><option value="vital">Vital</option>
+            </select>
+          </p>
+          <p class="field">
+            <label for="p_decor">Decor</label>
+            <select id="p_decor" class="priority" data-cat="decor">
+              <option value="low">Low</option><option value="normal" selected>Normal</option>
+              <option value="high">High</option><option value="vital">Vital</option>
+            </select>
+          </p>
+          <p class="field">
+            <label for="p_photography">Photo &amp; video</label>
+            <select id="p_photography" class="priority" data-cat="photography">
+              <option value="low">Low</option><option value="normal" selected>Normal</option>
+              <option value="high">High</option><option value="vital">Vital</option>
+            </select>
+          </p>
+          <p class="field">
+            <label for="p_entertainment">Music &amp; entertainment</label>
+            <select id="p_entertainment" class="priority" data-cat="entertainment">
+              <option value="low">Low</option><option value="normal" selected>Normal</option>
+              <option value="high">High</option><option value="vital">Vital</option>
+            </select>
+          </p>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Taste &amp; constraints</legend>
+        <p class="field">
+          <label for="vibe">Describe the feeling in a line or two</label>
+          <textarea id="vibe" name="vibe" rows="3" maxlength="2000"
+                    placeholder="Warm, close-knit, outdoors under old trees. Lots of local food, no flashy decor."></textarea>
+        </p>
+        <div class="grid">
+          <p class="field">
+            <label for="dietary">Dietary needs (comma separated)</label>
+            <input id="dietary" name="dietary" type="text" placeholder="vegetarian, jain options">
+          </p>
+          <p class="field">
+            <label for="accessibility">Accessibility needs (comma separated)</label>
+            <input id="accessibility" name="accessibility" type="text" placeholder="step-free access, seating for elders">
+          </p>
+        </div>
+        <p class="field">
+          <label for="avoid">Anything to avoid (comma separated)</label>
+          <input id="avoid" name="avoid" type="text" placeholder="fireworks, loud DJ, alcohol">
+        </p>
+      </fieldset>
+
+      <div class="actions">
+        <!-- type=button, not submit: the form is handled by script and a
+             stray Enter keypress must not fire a network request. -->
+        <button type="button" id="plan-btn" class="primary">Make my plan</button>
+        <button type="button" id="demo-btn" class="secondary">Try the demo</button>
+        <button type="reset" id="reset-btn" class="ghost">Reset</button>
+      </div>
+    </form>
+
+    <!-- Errors are announced, not just coloured: aria-live=assertive plus
+         role=alert means a screen reader speaks them immediately. -->
+    <div id="error-box" class="error-box" role="alert" aria-live="assertive" hidden>
+      <h3>We could not build that plan</h3>
+      <ul id="error-list"></ul>
+    </div>
+  </section>
+
+  <!-- ============================ RESULTS ============================ -->
+  <section id="results" aria-labelledby="results-heading" hidden>
+    <h2 id="results-heading" tabindex="-1">Your plan</h2>
+
+    <div class="toolbar" role="group" aria-label="Plan actions">
+      <button type="button" id="copy-json" class="secondary">Copy plan as JSON</button>
+      <button type="button" id="print-btn" class="secondary">Print / save as PDF</button>
+      <span id="copy-status" class="hint" role="status" aria-live="polite"></span>
+    </div>
+
+    <nav class="toc" aria-label="Sections of this plan">
+      <ul id="toc-list"></ul>
+    </nav>
+
+    <section aria-labelledby="sum-heading">
+      <h3 id="sum-heading">At a glance</h3>
+      <dl class="summary" id="summary"></dl>
+    </section>
+
+    <section aria-labelledby="budget-heading">
+      <h3 id="budget-heading">Budget</h3>
+      <p class="hint" id="budget-explainer"></p>
+      <div class="table-scroll">
+        <table id="budget-table">
+          <caption class="visually-hidden">Budget allocation by category</caption>
+          <thead>
+            <tr><th scope="col">Category</th><th scope="col">Share</th><th scope="col" class="num">Amount</th><th scope="col" class="num">Per guest</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="tradeoffs"></div>
+    </section>
+
+    <section aria-labelledby="timeline-heading">
+      <h3 id="timeline-heading">Timeline</h3>
+      <p id="feasibility" class="callout"></p>
+      <ol class="critical-chain" id="critical-chain" aria-label="Critical path, in order"></ol>
+      <div class="table-scroll">
+        <table id="task-table">
+          <caption class="visually-hidden">All tasks with due date, owner and slack</caption>
+          <thead>
+            <tr><th scope="col">Due</th><th scope="col">Task</th><th scope="col">Owner</th><th scope="col" class="num">Slack</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <h4 id="ros-heading">Day-of run sheet</h4>
+      <ol id="run-of-show" aria-labelledby="ros-heading"></ol>
+    </section>
+
+    <section aria-labelledby="vendor-heading">
+      <h3 id="vendor-heading">Vendors &amp; contracts</h3>
+      <ul class="cards" id="vendor-list"></ul>
+      <h4 id="pay-heading">Payment schedule</h4>
+      <div class="table-scroll">
+        <table id="payment-table">
+          <caption class="visually-hidden">Dated payment milestones</caption>
+          <thead><tr><th scope="col">Due</th><th scope="col">What</th><th scope="col" class="num">Amount</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section aria-labelledby="risk-heading">
+      <h3 id="risk-heading">Risks worth planning for</h3>
+      <ul class="cards" id="risk-list"></ul>
+    </section>
+
+    <section aria-labelledby="idea-heading">
+      <h3 id="idea-heading">Personalised ideas</h3>
+      <ul class="cards" id="idea-list"></ul>
+    </section>
+
+    <section aria-labelledby="warn-heading">
+      <h3 id="warn-heading">Worth knowing</h3>
+      <ul id="warning-list"></ul>
+    </section>
+
+    <details class="raw">
+      <summary>Raw plan JSON</summary>
+      <pre id="raw-json" tabindex="0"></pre>
+    </details>
+  </section>
+
+  <p class="footnote">
+    Sutradhar computes every number locally with deterministic engines, then optionally
+    asks a language model only for wording. No account, no tracking, no data leaves this
+    page except the brief you submit to your own server.
+  </p>
+</main>
+
+<script src="app.js" defer></script>
+</body>
+</html>

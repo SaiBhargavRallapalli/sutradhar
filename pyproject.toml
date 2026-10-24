@@ -1,0 +1,87 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sutradhar"
+version = "1.0.0"
+description = "Sutradhar - a GenAI celebration & event planning co-pilot for weddings, birthdays and community events."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Sutradhar Contributors" }]
+keywords = ["genai", "event-planning", "wedding", "birthday", "community", "budget", "timeline"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Scheduling",
+]
+
+# Sutradhar intentionally has ZERO runtime dependencies.
+# Everything (budgeting, CPM scheduling, LLM adapters, exports, CLI, web server)
+# is built on the Python standard library so the project is trivially portable,
+# auditable and free of supply-chain risk.
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.5",
+    "mypy>=1.10",
+]
+
+[project.scripts]
+sutradhar = "sutradhar.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/your-org/sutradhar"
+Documentation = "https://github.com/your-org/sutradhar#readme"
+Issues = "https://github.com/your-org/sutradhar/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+sutradhar = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = [
+    "slow: tests that exercise the LLM repair loop end-to-end",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF"]
+ignore = [
+    "E501", # line length is enforced by the formatter
+    "RUF001", # ambiguous unicode - we deliberately use Devanagari in docstrings
+    "RUF002",
+    "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["SIM117"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+packages = ["sutradhar"]
+mypy_path = "src"
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false

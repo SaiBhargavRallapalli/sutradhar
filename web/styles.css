@@ -1,0 +1,371 @@
+/* ==========================================================================
+   Sutradhar web UI
+   --------------------------------------------------------------------------
+   No build step, no framework, no dependencies. Three deliberate rules:
+
+   1. Colour is never the only signal. Every state pairs colour with a glyph,
+      a label or a border pattern, so it survives greyscale, high-contrast
+      mode and colour-blindness.
+   2. Contrast comes first. Text/background pairs meet WCAG AA (>=4.5:1) in
+      both schemes; the palette is chosen for it, not retrofitted.
+   3. Motion is optional. Everything animated is gated behind
+      prefers-reduced-motion.
+   ========================================================================== */
+
+:root {
+  color-scheme: light dark;
+
+  /* Type scale — rem so a user's browser font-size preference is respected. */
+  --fs-sm:  0.875rem;
+  --fs-md:  1rem;
+  --fs-lg:  1.25rem;
+  --fs-xl:  1.5rem;
+  --fs-2xl: 2rem;
+
+  --measure: 68ch;   /* comfortable reading width */
+  --radius: 10px;
+  --gap: 1rem;
+
+  /* Light scheme (default). Contrast ratios checked against --surface. */
+  --surface:      #fbf9f6;
+  --surface-alt:  #f2ede6;
+  --surface-card: #ffffff;
+  --ink:          #1c1917;  /* 16.4:1 on --surface */
+  --ink-soft:     #4b443c;  /*  8.6:1 on --surface */
+  --accent:       #7c2d12;  /*  8.1:1 on --surface */
+  --accent-soft:  #9a3412;
+  --accent-wash:  #fdf0e7;
+  --line:         #ddd2c4;
+  --good:         #14532d;  /*  9.3:1 */
+  --warn:         #713f12;  /*  8.0:1 */
+  --bad:          #7f1d1d;  /* 11.2:1 */
+  --focus:        #1d4ed8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface:      #14110f;
+    --surface-alt:  #1e1a17;
+    --surface-card: #211d1a;
+    --ink:          #f5f1ec;  /* 15.8:1 on --surface */
+    --ink-soft:     #c3b8ac;  /*  9.1:1 */
+    --accent:       #fdba74;  /* 10.9:1 */
+    --accent-soft:  #fb923c;
+    --accent-wash:  #2c2118;
+    --line:         #3b332c;
+    --good:         #86efac;
+    --warn:         #fcd34d;
+    --bad:          #fca5a5;
+    --focus:        #93c5fd;
+  }
+}
+
+/* Windows High Contrast / forced-colors: let the OS palette win, and give
+   every interactive element a real border so it stays visible. */
+@media (forced-colors: active) {
+  * { forced-color-adjust: auto; }
+  button, input, select, textarea { border: 2px solid ButtonText; }
+  :focus-visible { outline: 3px solid Highlight; }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  font-size: var(--fs-md);
+  line-height: 1.6;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.wrap {
+  max-width: 60rem;
+  margin-inline: auto;
+  padding-inline: var(--gap);
+}
+
+/* ---- Skip link: first focusable element, visible only on focus ---------- */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  padding: 0.75rem 1rem;
+  background: var(--accent);
+  color: var(--surface);
+  font-weight: 600;
+  border-radius: 0 0 var(--radius) 0;
+}
+.skip-link:focus { left: 0; }
+
+/* ---- Visible, consistent focus for keyboard users ---------------------- */
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+/* Mouse users don't get a ring, keyboard users always do. */
+:focus:not(:focus-visible) { outline: none; }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---- Header ------------------------------------------------------------ */
+.site-header {
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--line);
+  padding-block: 2rem;
+}
+.site-header h1 {
+  margin: 0;
+  font-size: var(--fs-2xl);
+  letter-spacing: -0.02em;
+}
+.tagline {
+  margin: 0.5rem 0 0;
+  max-width: var(--measure);
+  color: var(--ink-soft);
+}
+.mode { margin: 0.5rem 0 0; font-size: var(--fs-sm); color: var(--ink-soft); }
+.mode::before { content: "● "; color: var(--good); }
+
+/* ---- Sections & forms -------------------------------------------------- */
+main > section { padding-block: 2rem; border-bottom: 1px solid var(--line); }
+
+h2 { font-size: var(--fs-xl); margin-top: 0; }
+h3 { font-size: var(--fs-lg); margin-top: 2rem; }
+h4 { font-size: var(--fs-md); margin-top: 1.5rem; }
+
+fieldset {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--gap);
+  margin: 0 0 var(--gap);
+  background: var(--surface-card);
+}
+legend {
+  font-weight: 600;
+  padding-inline: 0.5rem;
+  color: var(--accent);
+}
+
+.grid {
+  display: grid;
+  gap: var(--gap);
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+}
+
+.field { margin: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.field label { font-weight: 600; font-size: var(--fs-sm); }
+.hint { font-size: var(--fs-sm); color: var(--ink-soft); }
+
+input, select, textarea {
+  font: inherit;
+  padding: 0.5rem 0.625rem;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  width: 100%;
+  min-height: 2.75rem;   /* 44px touch target */
+}
+textarea { min-height: 5rem; resize: vertical; }
+
+/* Invalid fields get a patterned border + a glyph, never colour alone. */
+[aria-invalid="true"] {
+  border-color: var(--bad);
+  border-left-width: 4px;
+  background-image: repeating-linear-gradient(
+    135deg, transparent, transparent 6px, rgba(127, 29, 29, 0.08) 6px, rgba(127, 29, 29, 0.08) 12px);
+}
+.field-error { font-size: var(--fs-sm); color: var(--bad); font-weight: 600; }
+.field-error::before { content: "⚠ "; }
+
+/* ---- Buttons ----------------------------------------------------------- */
+.actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: var(--gap); }
+
+button {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.7rem 1.25rem;
+  min-height: 2.75rem;
+  border-radius: var(--radius);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+button.primary { background: var(--accent); color: var(--surface); }
+button.secondary { background: var(--surface-card); color: var(--ink); border-color: var(--line); }
+button.ghost { background: transparent; color: var(--ink-soft); border-color: transparent; text-decoration: underline; }
+button:hover:not(:disabled) { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18); }
+button:active:not(:disabled) { transform: translateY(1px); }
+button:disabled { opacity: 0.55; cursor: not-allowed; }
+
+button[aria-busy="true"]::after {
+  content: " …";
+  animation: pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse { 50% { opacity: 0.35; } }
+
+/* ---- Errors ------------------------------------------------------------ */
+.error-box {
+  margin-top: var(--gap);
+  padding: var(--gap);
+  border: 2px solid var(--bad);
+  border-left-width: 8px;
+  border-radius: var(--radius);
+  background: var(--surface-card);
+}
+.error-box h3 { margin: 0 0 0.5rem; color: var(--bad); font-size: var(--fs-md); }
+.error-box ul { margin: 0; padding-left: 1.25rem; }
+
+/* ---- Results ----------------------------------------------------------- */
+.toolbar { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+
+.toc ul { list-style: none; display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0; margin: var(--gap) 0; }
+.toc a {
+  display: inline-block;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--ink);
+  font-size: var(--fs-sm);
+}
+.toc a:hover { background: var(--accent-wash); border-color: var(--accent); }
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--gap);
+  margin: 0;
+}
+.summary > div {
+  padding: var(--gap);
+  background: var(--surface-card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.summary dt { font-size: var(--fs-sm); color: var(--ink-soft); font-weight: 600; }
+.summary dd { margin: 0.25rem 0 0; font-size: var(--fs-lg); font-weight: 700; }
+
+.callout {
+  padding: var(--gap);
+  border-radius: var(--radius);
+  border-left: 6px solid;
+  background: var(--surface-card);
+}
+.callout.good { border-color: var(--good); }
+.callout.bad  { border-color: var(--bad); }
+.callout.good::before { content: "✓ "; color: var(--good); font-weight: 700; }
+.callout.bad::before  { content: "✗ "; color: var(--bad);   font-weight: 700; }
+
+/* ---- Tables: horizontally scrollable, never clipped --------------------- */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+caption { text-align: left; padding-block: 0.5rem; color: var(--ink-soft); }
+th, td { text-align: left; padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--line); }
+th { font-weight: 700; border-bottom-width: 2px; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tbody tr:nth-child(even) { background: var(--surface-alt); }
+
+/* Budget bars: width encodes the value, so it reads without colour. */
+.bar {
+  display: block;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  overflow: hidden;
+  margin-top: 0.25rem;
+}
+.bar > span { display: block; height: 100%; background: var(--accent); }
+
+.flag {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0 0.35rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border: 1px solid currentColor;
+}
+.flag.warn { color: var(--warn); }
+
+/* ---- Lists & cards ----------------------------------------------------- */
+.cards { list-style: none; padding: 0; display: grid; gap: var(--gap); grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); }
+.cards > li {
+  padding: var(--gap);
+  background: var(--surface-card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.cards h4 { margin: 0 0 0.35rem; font-size: var(--fs-md); }
+.cards p { margin: 0.25rem 0; }
+.cards dl { margin: 0.5rem 0 0; font-size: var(--fs-sm); }
+.cards dt { font-weight: 700; color: var(--ink-soft); }
+.cards dd { margin: 0 0 0.4rem; }
+
+.critical-chain { list-style: none; counter-reset: cp; padding: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.critical-chain li {
+  counter-increment: cp;
+  padding: 0.35rem 0.75rem;
+  background: var(--accent-wash);
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius);
+  font-size: var(--fs-sm);
+}
+.critical-chain li::before { content: counter(cp) ". "; font-weight: 700; color: var(--accent); }
+
+#run-of-show { padding-left: 1.25rem; }
+#run-of-show li { margin-bottom: 0.35rem; }
+#run-of-show .t { font-variant-numeric: tabular-nums; font-weight: 700; }
+
+#warning-list li { margin-bottom: 0.75rem; }
+#warning-list li::marker { content: "⚠ "; color: var(--warn); }
+
+.raw { margin-top: 2rem; }
+.raw pre {
+  overflow-x: auto;
+  padding: var(--gap);
+  background: var(--surface-alt);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: var(--fs-sm);
+  max-height: 30rem;
+}
+
+.footnote { color: var(--ink-soft); font-size: var(--fs-sm); max-width: var(--measure); }
+
+/* ---- Print: the plan is meant to survive a PDF ------------------------- */
+@media print {
+  .site-header, .actions, .toolbar, .toc, .skip-link, .raw, form, .footnote { display: none !important; }
+  body { background: #fff; color: #000; }
+  main > section { border: none; break-inside: avoid; }
+  .cards { grid-template-columns: 1fr; }
+  a[href]::after { content: ""; }
+}
+
+/* ---- Reduced motion: everything animated becomes instant --------------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Respect a user's larger-text preference without breaking layout. */
+@media (min-resolution: 0.001dpcm) { :root { --measure: 62ch; } }
