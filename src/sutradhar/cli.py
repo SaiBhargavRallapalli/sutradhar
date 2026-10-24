@@ -18,10 +18,12 @@ import json
 import os
 import sys
 import textwrap
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Sequence
 
+from .ai import resolve_provider
+from .ai.brief import try_brief_from_text
 from .config import Settings, load_settings
 from .enums import CityTier, EventType, Priority, RiskLevel, WindExposure
 from .export import budget_csv, timeline_csv, to_ics, to_markdown, vendor_csv, write_plan
@@ -29,6 +31,7 @@ from .inputs import brief_from_dict
 from .models import Brief, Plan
 from .money import Currency, format_minor
 from .pipeline import plan_event
+from .server.app import serve
 from .version import __version__
 
 # ---------------------------------------------------------------------------
@@ -267,13 +270,11 @@ def render_plan(plan: Plan, p: Painter) -> list[str]:
 # ---------------------------------------------------------------------------
 def demo_brief() -> Brief:
     """The story the demo tells: a Pune wedding, tight-ish budget, eco-minded couple."""
-    import datetime as _dt
-
     today = date.today()
     # Aim ~9 months out, on the first Sunday of June next year.
-    target = _dt.date(today.year + (1 if (today.month, today.day) > (6, 7) else 0), 6, 1)
+    target = date(today.year + (1 if (today.month, today.day) > (6, 7) else 0), 6, 1)
     while target.weekday() != 6:
-        target += _dt.timedelta(days=1)
+        target += timedelta(days=1)
 
     return Brief(
         event_type=EventType.WEDDING,
@@ -298,8 +299,6 @@ def demo_brief() -> Brief:
 
 def _provider_for(settings: Settings) -> Any:
     """Resolve a provider; return ``None`` to force the offline catalogue."""
-    from .ai import resolve_provider
-
     if not settings.ai_enabled:
         return None
     return resolve_provider(settings)
@@ -349,8 +348,6 @@ def cmd_brief(args: argparse.Namespace) -> int:
     if args.offline:
         settings = settings.with_overrides(ai_enabled=False)
 
-    from .ai.brief import try_brief_from_text
-
     provider = _provider_for(settings)
     if provider is None:
         print("error: parsing a natural-language brief needs a model; "
@@ -389,8 +386,6 @@ def cmd_export(args: argparse.Namespace) -> int:
 
 
 def cmd_web(args: argparse.Namespace) -> int:
-    from .server.app import serve
-
     return serve(host=args.host, port=args.port, web_root=args.web_root)
 
 

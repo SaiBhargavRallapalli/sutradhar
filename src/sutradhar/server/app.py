@@ -150,6 +150,9 @@ def make_handler(
     class Handler(BaseHTTPRequestHandler):
         server_version = f"sutradhar/{__version__}"
         protocol_version = "HTTP/1.1"
+        # Idle clients are dropped instead of holding a thread forever
+        # (slow-loris). Thirty seconds is generous for a sub-second planner.
+        timeout = 30
 
         # -- plumbing ------------------------------------------------------
         def log_message(self, fmt: str, *args: Any) -> None:  # noqa: A003
@@ -348,7 +351,7 @@ def serve(host: str = "127.0.0.1", port: int = 8787, web_root: str | Path | None
         return 1
 
     live = bool(getattr(provider, "is_configured", lambda: False)())
-    mode = f"model {getattr(provider, 'model', '?')}" if live else "offline catalogue"
+    mode = f"model {provider.model}" if live else "offline catalogue"
     echo(f"  Sutradhar {__version__} serving on http://{bind}:{port}/  ({mode})")
     echo("  press Ctrl+C to stop")
     try:

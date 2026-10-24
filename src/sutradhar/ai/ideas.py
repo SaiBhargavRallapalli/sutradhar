@@ -161,12 +161,16 @@ def generate_ideas(
             provider_name="catalogue",
         )
 
+    # Ranked once and reused: the names steer the model away from repeats,
+    # and the concepts themselves are the fallback if the model path fails.
+    catalogue = catalogue_ideas(brief, budget, profile, limit=6)
+
     user_prompt = build_ideas_user(
         brief,
         budget,
         profile,
         screened,
-        existing_names=tuple(idea.name for idea in catalogue_ideas(brief, budget, profile, limit=6)),
+        existing_names=tuple(idea.name for idea in catalogue),
     )
 
     raw = ""
@@ -218,7 +222,7 @@ def generate_ideas(
         )
 
     return IdeaResult(
-        ideas=catalogue_ideas(brief, budget, profile, limit=limit),
+        ideas=catalogue[:limit],
         warnings=tuple(warnings),
         used_model=False,
         provider_name="catalogue",

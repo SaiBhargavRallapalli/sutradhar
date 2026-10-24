@@ -57,6 +57,11 @@ class Provider(ABC):
     #: ``False`` for offline stubs, so callers know to prefer the catalogue.
     is_live: ClassVar[bool] = False
 
+    @property
+    def model(self) -> str:
+        """Model identifier; ``"unconfigured"`` unless a live backend names one."""
+        return "unconfigured"
+
     @abstractmethod
     def complete(self, system: str, user: str, *, temperature: float = 0.7, timeout: float = 45.0) -> str:
         """Return the model's raw text response for one prompt pair."""

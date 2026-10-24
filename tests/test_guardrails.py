@@ -167,6 +167,11 @@ class TestRedaction:
     def test_masks_github_tokens(self) -> None:
         assert "ghp_" not in redact("token ghp_abcdefghijklmnop123456")
 
+    def test_masks_groq_keys(self) -> None:
+        out = redact("key is gsk_abcdefghijklmnop1234567890abcd")
+        assert "gsk_abcde" not in out
+        assert "REDACTED" in out
+
     def test_masks_aws_keys(self) -> None:
         # The short prefix is kept on purpose: it identifies which kind of
         # secret leaked without revealing the secret itself.

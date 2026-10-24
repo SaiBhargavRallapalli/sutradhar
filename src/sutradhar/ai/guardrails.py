@@ -66,6 +66,7 @@ _SECRET_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bsk-[A-Za-z0-9_\-]{16,}"), "sk-***REDACTED***"),
     (re.compile(r"\bAIza[0-9A-Za-z_\-]{16,}"), "AIza***REDACTED***"),
     (re.compile(r"\bgh[pousr]_[A-Za-z0-9]{16,}"), "gh_***REDACTED***"),
+    (re.compile(r"\bgsk_[A-Za-z0-9]{16,}"), "gsk_***REDACTED***"),
     (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "AKIA***REDACTED***"),
     (re.compile(r"(?i)\bbearer\s+[A-Za-z0-9_\-\.=]{16,}"), "Bearer ***REDACTED***"),
     (

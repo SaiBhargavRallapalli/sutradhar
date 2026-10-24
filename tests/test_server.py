@@ -273,6 +273,13 @@ class TestRateLimiter:
         assert limiter.allow("a") is True
 
 
+class TestConnectionHardening:
+    def test_handler_drops_idle_connections(self) -> None:
+        """Slow-loris guard: the handler must bound idle socket lifetime."""
+        handler = make_handler(None, None, RateLimiter(limit=1000), lambda *_: None)
+        assert handler.timeout == 30
+
+
 class TestWebRootDiscovery:
     def test_finds_the_bundled_web_root(self) -> None:
         root = _find_web_root(None)
