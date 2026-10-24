@@ -111,7 +111,10 @@ def _find_web_root(explicit: str | Path | None) -> Path | None:
     if explicit:
         candidate = Path(explicit).expanduser().resolve()
         return candidate if (candidate / "index.html").is_file() else None
-    for candidate in _WEB_ROOT_CANDIDATES:
+    # A non-editable wheel install puts this module under site-packages while
+    # Render starts the process from the checked-out repository containing
+    # ``web/``. Source/editable installs use the module-relative fallbacks.
+    for candidate in (Path.cwd() / "web", *_WEB_ROOT_CANDIDATES):
         if (candidate / "index.html").is_file():
             return candidate.resolve()
     return None

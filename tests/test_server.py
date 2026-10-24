@@ -418,10 +418,15 @@ class TestConnectionHardening:
 
 
 class TestWebRootDiscovery:
-    def test_finds_the_bundled_web_root(self) -> None:
+    def test_finds_web_root_from_installed_process_working_directory(
+        self, monkeypatch, tmp_path
+    ) -> None:
+        expected = tmp_path / "web"
+        expected.mkdir()
+        (expected / "index.html").write_text("<html></html>")
+        monkeypatch.chdir(tmp_path)
         root = _find_web_root(None)
-        assert root is not None
-        assert (root / "index.html").is_file()
+        assert root == expected.resolve()
 
     def test_explicit_missing_root_returns_none(self, tmp_path) -> None:
         assert _find_web_root(str(tmp_path)) is None
