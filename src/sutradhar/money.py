@@ -55,6 +55,7 @@ class Currency(str, Enum):
 
     @property
     def info(self) -> CurrencyInfo:
+        """Static metadata for this currency."""
         return _INFO[self.value]
 
     @classmethod

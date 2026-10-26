@@ -172,9 +172,11 @@ class EventTypeProfile:
     notes: tuple[str, ...] = field(default_factory=tuple)
 
     def category(self, key: str) -> CategorySpec | None:
+        """The budget category with ``key``, or ``None`` if absent."""
         return next((c for c in self.categories if c.key == key), None)
 
     def task(self, task_id: str) -> TaskSpec | None:
+        """The task spec with ``id``, or ``None`` if absent."""
         return next((t for t in self.tasks if t.id == task_id), None)
 
 

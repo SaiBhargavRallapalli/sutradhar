@@ -129,6 +129,7 @@ class ResilientProvider(Provider):
         return value
 
     def snapshot(self) -> ProviderStats:
+        """Point-in-time cache and circuit-breaker counters."""
         with self._lock:
             return ProviderStats(
                 upstream_calls=self._upstream_calls,

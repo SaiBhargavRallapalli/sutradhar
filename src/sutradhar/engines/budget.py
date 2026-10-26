@@ -91,6 +91,7 @@ class _WaterFill:
         return [i for i, value in enumerate(self.fixed) if value is None]
 
     def total_weight(self, free: list[int]) -> float:
+        """Sum of the free categories' preference weights."""
         return sum(self.shares[i] for i in free)
 
     def pin_out_of_band(self, free: list[int], total_weight: float) -> list[int]:

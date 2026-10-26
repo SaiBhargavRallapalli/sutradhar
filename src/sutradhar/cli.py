@@ -66,6 +66,7 @@ class Painter:
         self.enabled = enabled
 
     def p(self, style: str, text: str) -> str:
+        """Wrap ``text`` in ``style`` when colour is enabled."""
         if not self.enabled or not style:
             return text
         return f"{_STYLES.get(style, '')}{text}{_RESET}"
@@ -437,6 +438,7 @@ def _emit(plan: Plan, p: Painter, args: argparse.Namespace, out_dir: str | None)
 
 
 def cmd_demo(args: argparse.Namespace) -> int:
+    """Plan the built-in sample wedding and print or emit it."""
     p = Painter(_use_color(args))
     if not args.json:
         print(p.p("b1", f"\n  Sutradhar {__version__} - celebration & event planner"))
@@ -449,6 +451,7 @@ def cmd_demo(args: argparse.Namespace) -> int:
 
 
 def cmd_plan(args: argparse.Namespace) -> int:
+    """Plan from a structured JSON brief file."""
     p = Painter(_use_color(args))
     brief = brief_from_dict(json.loads(Path(args.brief).read_text(encoding="utf-8")))
     settings = load_settings()
@@ -459,6 +462,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
 
 
 def cmd_brief(args: argparse.Namespace) -> int:
+    """Plan from a natural-language brief (needs a live model)."""
     p = Painter(_use_color(args))
     text = args.text or sys.stdin.read()
     settings = load_settings()
@@ -484,6 +488,7 @@ def cmd_brief(args: argparse.Namespace) -> int:
 
 
 def cmd_export(args: argparse.Namespace) -> int:
+    """Write a single artefact for a JSON brief."""
     p = Painter(_use_color(args))
     brief = brief_from_dict(json.loads(Path(args.brief).read_text(encoding="utf-8")))
     settings = load_settings().with_overrides(ai_enabled=False)
@@ -506,6 +511,7 @@ def cmd_export(args: argparse.Namespace) -> int:
 
 
 def cmd_web(args: argparse.Namespace) -> int:
+    """Serve the web UI and JSON API."""
     return serve(host=args.host, port=args.port, web_root=args.web_root)
 
 
@@ -535,6 +541,7 @@ def _add_common(sub: Any, name: str, help_text: str) -> argparse.ArgumentParser:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Construct the full command-line parser."""
     parser = argparse.ArgumentParser(
         prog="sutradhar",
         description="Sutradhar - a deterministic, catalogue-driven celebration & event planner. "
@@ -575,6 +582,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Run the CLI and return the process exit code."""
     parser = build_parser()
     args = parser.parse_args(list(argv) if argv is not None else None)
     try:

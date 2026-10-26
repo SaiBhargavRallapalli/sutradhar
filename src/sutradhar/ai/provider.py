@@ -75,6 +75,7 @@ class Provider(ABC):
         """Return the model's raw text response for one prompt pair."""
 
     def is_configured(self) -> bool:
+        """True when the backend has the credentials its live mode needs."""
         return True
 
 

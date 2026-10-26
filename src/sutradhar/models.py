@@ -84,6 +84,7 @@ class TasteProfile:
 
     @property
     def is_empty(self) -> bool:
+        """True when the host gave no preferences at all."""
         return not any(
             (
                 self.palette,
@@ -143,10 +144,12 @@ class Brief:
     # -- derived ------------------------------------------------------------ #
     @property
     def budget_total(self) -> float:
+        """Budget as a major-unit float, for display and prose."""
         return float(self.budget_total_minor / (10**self.currency.info.decimals))
 
     @property
     def display_title(self) -> str:
+        """The host's title, or a readable event-and-date fallback."""
         if self.title.strip():
             return self.title.strip()
         return f"{self.event_type.value.title()} on {self.event_date:%d %b %Y}"
@@ -176,6 +179,7 @@ class Brief:
                 raise BriefError(f"priorities.{key}", f"unknown priority {priority!r}")
 
     def to_dict(self) -> dict[str, Any]:
+        """JSON-ready mapping, including the computed fields."""
         return with_computed(self)
 
 
@@ -216,6 +220,7 @@ class BudgetLine:
 
     @property
     def amount(self) -> float:
+        """This line's amount in major units (not minor units)."""
         return self.amount_minor / 100.0
 
 
@@ -235,6 +240,7 @@ class TradeOff:
 
     @property
     def saving(self) -> float:
+        """What the host frees up, in major units."""
         return self.saving_minor / 100.0
 
 
@@ -271,11 +277,13 @@ class BudgetPlan:
 
     @property
     def contingency_pct(self) -> float:
+        """Contingency as a percentage of the total, to two decimals."""
         if self.total_minor == 0:
             return 0.0
         return round(self.contingency_minor * 100.0 / self.total_minor, 2)
 
     def line(self, key: str) -> BudgetLine | None:
+        """The budget line for ``key``, or ``None`` if absent."""
         return next((ln for ln in self.lines if ln.key == key), None)
 
 
@@ -309,6 +317,7 @@ class Task:
 
     @property
     def days_before_event(self) -> int:
+        """Whole days from the plan date to the event (0 on the day)."""
         return max(0, -self.offset_days)
 
 
@@ -345,10 +354,12 @@ class TimelinePlan:
     _COMPUTED = ("critical_load_days",)
 
     def task(self, task_id: str) -> Task | None:
+        """The scheduled task with ``task_id``, or ``None`` if absent."""
         return next((t for t in self.tasks if t.id == task_id), None)
 
     @property
     def critical_load_days(self) -> int:
+        """Working days on the critical path that cannot slip."""
         return sum(t.duration_days for t in self.tasks if t.critical)
 
 
@@ -394,10 +405,12 @@ class VendorPlan:
     _COMPUTED = ("must_have_count",)
 
     def item(self, key: str) -> VendorItem | None:
+        """The vendor category for ``key``, or ``None`` if absent."""
         return next((v for v in self.items if v.key == key), None)
 
     @property
     def must_have_count(self) -> int:
+        """How many vendor categories are high-priority or vital."""
         return sum(1 for v in self.items if v.priority in (Priority.HIGH, Priority.VITAL))
 
 
@@ -421,6 +434,7 @@ class RiskItem:
 
     @property
     def score(self) -> int:
+        """Likelihood x impact, in the range 1..25."""
         return self.likelihood * self.impact
 
 
@@ -438,6 +452,7 @@ class RiskPlan:
         return sum(r.score for r in self.items if r.severity is not RiskLevel.LOW)
 
     def top(self, n: int = 3) -> tuple[RiskItem, ...]:
+        """The ``n`` highest-scoring risks, ties broken by title."""
         return tuple(sorted(self.items, key=lambda r: (-r.score, r.title))[:n])
 
 
@@ -468,6 +483,7 @@ class IdeaConcept:
 
     @property
     def within_budget(self) -> bool:
+        """True when the idea's cost was grounded against the budget."""
         return self.grounded
 
 
@@ -506,7 +522,9 @@ class Plan:
         return tuple(seen.values())
 
     def to_dict(self) -> dict[str, Any]:
+        """JSON-ready mapping of the whole plan, computed fields included."""
         return with_computed(self)
 
     def to_json(self, *, indent: int | None = 2) -> str:
+        """Serialise the plan to JSON, computed fields included."""
         return dumps(self, indent=indent)

@@ -119,6 +119,7 @@ class RiskLevel(str, _Parsable):
 
     @property
     def rank(self) -> int:
+        """Ordinal position, low to critical (1-4)."""
         return {RiskLevel.LOW: 1, RiskLevel.MEDIUM: 2, RiskLevel.HIGH: 3, RiskLevel.CRITICAL: 4}[
             self
         ]

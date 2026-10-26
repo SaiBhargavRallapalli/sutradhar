@@ -73,6 +73,7 @@ class StaticStore:
         if_none_match: str = "",
         head_only: bool = False,
     ) -> StaticResponse:
+        """Resolve a URL path, honouring gzip, ETag and HEAD."""
         path = "/index.html" if raw_path in {"", "/"} else raw_path
         if ".." in path.split("/"):
             body = b"403 Forbidden"
@@ -111,10 +112,12 @@ class StaticStore:
 
     @property
     def available(self) -> bool:
+        """True when the store actually holds an index page."""
         return "/index.html" in self._assets
 
     @property
     def asset_count(self) -> int:
+        """How many assets were loaded."""
         return len(self._assets)
 
 

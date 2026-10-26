@@ -45,6 +45,7 @@ class CostContext:
 
     @property
     def is_outdoor(self) -> bool:
+        """True unless the setting is explicitly indoor."""
         return self.setting is not WindExposure.INDOOR
 
 

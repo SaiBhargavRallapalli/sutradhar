@@ -386,6 +386,7 @@ def create_app(
     web_root: str | Path | None = None,
     echo: Callable[[str], None] | None = None,
 ) -> Application:
+    """Build the WSGI app around settings, a provider and the static UI."""
     runtime = settings or load_settings()
     resolved = provider or (resolve_provider(runtime) if runtime.ai_enabled else MockProvider())
     if resolved.is_live and not isinstance(resolved, ResilientProvider):

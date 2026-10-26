@@ -41,6 +41,7 @@ class RateLimiter:
         self._hits: OrderedDict[str, deque[float]] = OrderedDict()
 
     def check(self, key: str) -> RateDecision:
+        """Record a hit for ``key`` and say whether it is allowed."""
         now = self._clock()
         cutoff = now - self._window
         with self._lock:
@@ -63,6 +64,7 @@ class RateLimiter:
 
     @property
     def client_count(self) -> int:
+        """Number of clients holding a live bucket (diagnostics)."""
         with self._lock:
             return len(self._hits)
 

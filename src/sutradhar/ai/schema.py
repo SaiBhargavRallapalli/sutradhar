@@ -41,6 +41,7 @@ class FieldSpec:
 
     @property
     def type_label(self) -> str:
+        """Human-readable description of the accepted types."""
         return " or ".join(self.types)
 
 
@@ -51,6 +52,7 @@ class ObjectSpec:
     fields: tuple[FieldSpec, ...] = field(default_factory=tuple)
 
     def field(self, name: str) -> FieldSpec | None:
+        """The spec for ``name``, or ``None`` if absent."""
         return next((f for f in self.fields if f.name == name), None)
 
 

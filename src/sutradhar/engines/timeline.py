@@ -168,6 +168,7 @@ class _Scheduler:
         return es, ef, ls, lf
 
     def slack(self, es: dict[str, int], ls: dict[str, int]) -> dict[str, int]:
+        """Free float per task: latest start minus earliest start."""
         return {tid: ls[tid] - es[tid] for tid in es}
 
 

@@ -128,18 +128,24 @@ class Settings:
 
     @property
     def has_openai(self) -> bool:
+        """True when an OpenAI-compatible API key is configured."""
         return self.openai_api_key is not None
 
     @property
     def has_gemini(self) -> bool:
+        """True when a Gemini API key is configured."""
         return self.gemini_api_key is not None
 
     @property
     def has_any_provider(self) -> bool:
+        """True when at least one live provider is configured."""
         return self.has_openai or self.has_gemini
 
     def with_overrides(self, **kwargs: object) -> Settings:
         """Return a copy with ``kwargs`` applied (used by the CLI ``--no-ai`` flag)."""
+        # ``dataclasses.replace`` is typed per-field, so mypy cannot narrow a
+        # ``**kwargs: object`` bag down to those types. The ignore is scoped to
+        # that one diagnostic rather than silencing the line wholesale.
         return replace(self, **kwargs)  # type: ignore[arg-type]
 
 

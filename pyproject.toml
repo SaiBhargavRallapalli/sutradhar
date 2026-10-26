@@ -74,6 +74,9 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF"]
+# Maintainability rules we hold ourselves to: bounded complexity, bounded
+# branching/returns, and named constants instead of inline domain thresholds.
+extend-select = ["C901", "PLR0911", "PLR0912", "PLR0915", "PLR2004"]
 ignore = [
     "E501", # line length is enforced by the formatter
     "RUF001", # ambiguous unicode - we deliberately use Devanagari in docstrings
@@ -82,7 +85,12 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["SIM117"]
+# Tests assert against concrete expected values, so literal comparisons are the
+# point; the maintainability rules are aimed at library code.
+"tests/*" = ["SIM117", "C901", "PLR0911", "PLR0912", "PLR0915", "PLR2004"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
 
 [tool.mypy]
 python_version = "3.10"
