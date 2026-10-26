@@ -373,12 +373,14 @@ class TestRateLimiter:
         assert limiter.allow("b") is True
 
     def test_window_expiry_allows_requests_again(self) -> None:
-        import time
-
-        limiter = RateLimiter(limit=1, window_s=0.05)
+        # Inject the clock instead of sleeping: Windows' monotonic resolution is
+        # coarse enough that a real sleep can land on the wrong side of the
+        # boundary, and a deterministic clock is also simply faster.
+        now = 1_000.0
+        limiter = RateLimiter(limit=1, window_s=0.05, clock=lambda: now)
         assert limiter.allow("a") is True
         assert limiter.allow("a") is False
-        time.sleep(0.06)
+        now += 0.06
         assert limiter.allow("a") is True
 
     def test_bounds_client_cardinality(self) -> None:
