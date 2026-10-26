@@ -304,13 +304,13 @@ Three rules, applied everywhere:
    [`ALGORITHMS.md`](ALGORITHMS.md#money).
 
 The practical payoff: the same brief produces byte-identical engine output
-today and next month, which makes 411 tests meaningful and the demo reproducible.
+today and next month, which makes 457 tests meaningful and the demo reproducible.
 
 ---
 
 ## 9. Testing strategy
 
-411 tests, organised by the property each one protects — not by file:
+457 tests, organised by the property each one protects — not by file:
 
 | Module | Count | Protects |
 |---|---:|---|
@@ -322,7 +322,8 @@ today and next month, which makes 411 tests meaningful and the demo reproducible
 | `test_schema.py` | 35 | JSON extraction + validation + repair |
 | `test_export.py` | 40 | Markdown/CSV/ICS correctness (ICS: 50 unique UEVENTs) |
 | `test_server.py` | 55 | WSGI contract, origin policy, gzip/ETag, bounded limits |
-| `test_ai.py` | 12 | parsing, repair, deadlines, grounding and fallback |
+| `test_inputs.py` | 39 | untrusted mappings, date/amount parsing, validation errors |
+| `test_ai.py` | 19 | parsing, repair, deadlines, grounding and fallback |
 | `test_cli.py` | 8 | all commands and user-facing error boundaries |
 | `test_provider.py` | 7 | HTTP retries, redaction and provider contracts |
 | `test_config.py` | 6 | environment parsing, clamping and secret handling |

@@ -263,8 +263,8 @@ all output by `ai.guardrails.redact`.
 
 ## Testing
 
-**411 tests** with **92% combined statement/branch coverage** (95% lines,
-85% branches); CI enforces a minimum of 85%:
+**457 tests** with **94% combined statement/branch coverage** (96% of lines,
+85% of branches); CI enforces a minimum of 85%:
 
 | File | Tests | Covers |
 |---|---|---|
@@ -274,9 +274,10 @@ all output by `ai.guardrails.redact`.
 | `test_money.py` | 47 | Paise arithmetic, rounding, formatting |
 | `test_budget.py` | 43 | Reconciliation (`unallocated == 0`), contingency, trims |
 | `test_export.py` | 40 | md/csv/ics byte-level output |
-| `test_schema.py` | 35 | Brief parsing, natural-language inputs |
+| `test_inputs.py` | 39 | Untrusted mappings, date/amount parsing, every validation error |
+| `test_schema.py` | 35 | Model-output extraction, coercion, repair reporting |
 | `test_timeline.py` | 35 | Critical path, slack, compaction, feasibility |
-| `test_ai.py` | 12 | Model parsing, repair, grounding, fallback, deadlines |
+| `test_ai.py` | 19 | NL briefs, model parsing, grounding, fallback, guardrails |
 | `test_cli.py` | 8 | Every CLI command and error boundary |
 | `test_provider.py` | 7 | Transport retries, redaction, response contracts |
 | `test_config.py` | 6 | Environment parsing, clamping, secret-safe settings |
@@ -286,6 +287,11 @@ all output by `ai.guardrails.redact`.
 make test    # or: PYTHONPATH=src python3 -m pytest
 make check   # lint (ruff) + typecheck (mypy, strict) + test
 ```
+
+Ruff is configured to fail the build on cyclomatic complexity above 10, on
+excessive branching or return counts, and on unnamed numeric thresholds
+(`PLR2004`) — so the maintainability properties above are enforced, not just
+asserted.
 
 ---
 
@@ -348,9 +354,11 @@ src/sutradhar/
   export.py       # md + 3x csv + ics from one in-memory plan
   server/         # Waitress/WSGI API, security policy, limits, static cache
   cli.py          # demo | plan | brief | export | web
-tests/            # 411 tests, see table above
+tests/            # 457 tests, see table above
 web/              # dependency-free UI (index.html, app.js, styles.css)
 docs/             # ARCHITECTURE.md, ALGORITHMS.md, SECURITY.md
+SECURITY.md       # private vulnerability reporting (GitHub security tab)
+CONTRIBUTING.md   # setup, quality gates, how to add a vertical
 ```
 
 Deep dives: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (module map, data flow),
@@ -367,7 +375,7 @@ Deep dives: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (module map, data flo
 | Code quality (high) | `src/` layout, typed modules, pure-function engines, `make check` (ruff + strict mypy) |
 | Security (medium) | `docs/SECURITY.md`, guardrails, server validation, env-only secrets |
 | Efficiency (medium) | Integer money math, single-pass scheduling, gzip/ETag assets, AI LRU + in-flight dedupe |
-| Testing (low) | 411 tests, 92% combined coverage, multi-OS CI, reconciliation + concurrency invariants |
+| Testing (low) | 457 tests, 94% combined coverage, multi-OS CI, reconciliation + concurrency invariants |
 | Accessibility (low) | Keyboard-first web UI, no-color mode, offline-first, screen-reader-safe output |
 
 ---

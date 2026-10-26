@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any
 
 from .enums import CityTier, EventType, Priority, Season, WindExposure
@@ -44,7 +44,10 @@ def _parse_date(value: Any, field: str) -> date:
     if isinstance(value, (int, float)):
         # A timestamp in milliseconds or seconds.
         seconds = float(value) / 1000 if value > _MILLISECONDS_ABOVE else float(value)
-        return datetime.utcfromtimestamp(seconds).date()
+        try:
+            return datetime.fromtimestamp(seconds, tz=timezone.utc).date()
+        except (OverflowError, OSError, ValueError) as exc:
+            raise ValidationError(field, f"timestamp {value!r} is out of range") from exc
     text = str(value or "").strip()
     if not text:
         raise ValidationError(field, "a date is required (YYYY-MM-DD)")

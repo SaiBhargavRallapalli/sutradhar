@@ -10,7 +10,7 @@ it can reach an engine.
 from __future__ import annotations
 
 from ..config import Settings
-from ..exceptions import AIProviderError, AISchemaError
+from ..exceptions import AIProviderError, AISchemaError, SutradharError
 from ..inputs import brief_from_dict
 from ..models import Brief
 from .guardrails import sanitize_model_text, screen_input
@@ -101,7 +101,10 @@ def try_brief_from_text(
     """
     try:
         fields = parse_nl_brief(text, provider, settings)
-    except (AIProviderError, AISchemaError, ValueError) as exc:
+    except (SutradharError, ValueError) as exc:
+        # ``SutradharError`` covers guardrail rejections, provider failures and
+        # schema errors alike; the point of this function is that the caller
+        # never has to handle any of them.
         return None, f"Could not read that request: {exc}"
 
     merged: dict[str, object] = {
@@ -124,5 +127,5 @@ def try_brief_from_text(
     merged["natural_language"] = text
     try:
         return brief_from_dict(merged), "Parsed your request into a structured brief."
-    except ValueError as exc:
+    except (SutradharError, ValueError) as exc:
         return None, f"That request did not produce a usable brief: {exc}"
