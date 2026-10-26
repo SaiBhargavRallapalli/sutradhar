@@ -79,6 +79,10 @@ _BALANCE_OFFSET_DAYS = 3
 _PROGRESS_OFFSET_DAYS = 30
 #: Share taken as a progress payment where the deposit leaves room for one.
 _PROGRESS_PCT = 30.0
+#: Deposit plus progress may not exceed this share; otherwise pay in two stages.
+_MAX_STAGED_PCT = 90.0
+#: Deposits at or above this share are flagged as heavy up-front commitment.
+_HEAVY_DEPOSIT_PCT = 40.0
 
 
 def build_vendors(
@@ -155,7 +159,7 @@ def _milestones_for(
     vendor under-delivers.
     """
     deposit = max(0.0, min(100.0, deposit_pct))
-    progress = _PROGRESS_PCT if deposit + _PROGRESS_PCT <= 90.0 else 0.0
+    progress = _PROGRESS_PCT if deposit + _PROGRESS_PCT <= _MAX_STAGED_PCT else 0.0
     balance = max(0.0, 100.0 - deposit - progress)
 
     plan: list[tuple[str, date, float]] = [("Booking advance", book_by, deposit)]
@@ -198,7 +202,7 @@ def _warnings(
 ) -> list[PlanWarning]:
     out: list[PlanWarning] = []
 
-    heavy = [item for item in items if item.deposit_pct >= 40.0]
+    heavy = [item for item in items if item.deposit_pct >= _HEAVY_DEPOSIT_PCT]
     if heavy:
         names = ", ".join(item.label for item in heavy[:3])
         out.append(

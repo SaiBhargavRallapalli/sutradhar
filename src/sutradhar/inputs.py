@@ -30,6 +30,10 @@ _DATE_FORMATS = (
     "%B %d, %Y",
 )
 
+#: Above this raw value a numeric date is assumed to be epoch milliseconds
+#: rather than epoch seconds (1e11 seconds is already year 5138).
+_MILLISECONDS_ABOVE = 1e11
+
 
 def _parse_date(value: Any, field: str) -> date:
     """Accept an ISO date, several common written forms, or a ``datetime``."""
@@ -39,7 +43,7 @@ def _parse_date(value: Any, field: str) -> date:
         return value
     if isinstance(value, (int, float)):
         # A timestamp in milliseconds or seconds.
-        seconds = float(value) / 1000 if value > 1e11 else float(value)
+        seconds = float(value) / 1000 if value > _MILLISECONDS_ABOVE else float(value)
         return datetime.utcfromtimestamp(seconds).date()
     text = str(value or "").strip()
     if not text:

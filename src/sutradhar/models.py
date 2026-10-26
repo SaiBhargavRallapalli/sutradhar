@@ -54,6 +54,9 @@ MAX_GUESTS = 100_000
 MAX_TITLE_LEN = 120
 MAX_NOTES_LEN = 2_000
 
+#: Tokens shorter than this ("of", "a", "the") carry no similarity signal.
+_MIN_SIGNAL_TOKEN_LEN = 3
+
 
 # --------------------------------------------------------------------------- #
 # Inputs
@@ -105,9 +108,13 @@ class TasteProfile:
             self.must_haves,
         ):
             for item in group:
-                tokens.update(t for t in item.lower().replace("/", " ").split() if len(t) > 2)
+                tokens.update(
+                    t
+                    for t in item.lower().replace("/", " ").split()
+                    if len(t) >= _MIN_SIGNAL_TOKEN_LEN
+                )
         if self.vibe:
-            tokens.update(t for t in self.vibe.lower().split() if len(t) > 2)
+            tokens.update(t for t in self.vibe.lower().split() if len(t) >= _MIN_SIGNAL_TOKEN_LEN)
         return tokens - {"and", "the", "with", "for"}
 
 

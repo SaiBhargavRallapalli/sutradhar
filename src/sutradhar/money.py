@@ -26,6 +26,10 @@ __all__ = [
     "to_minor",
 ]
 
+#: Digits per display group. Indian grouping uses a leading three then twos.
+_GROUP_SIZE = 3
+_INDIAN_GROUP_SIZE = 2
+
 
 @dataclass(frozen=True, slots=True)
 class CurrencyInfo:
@@ -118,21 +122,21 @@ def _group(digits: str, indian: bool) -> str:
     Indian grouping is ``1,23,45,678`` (a leading group of three, then twos);
     the international default is groups of three (``12,345,678``).
     """
-    if len(digits) <= 3:
+    if len(digits) <= _GROUP_SIZE:
         return digits
     if not indian:
-        head, tail = digits[:-3], digits[-3:]
+        head, tail = digits[:-_GROUP_SIZE], digits[-_GROUP_SIZE:]
         out = tail
-        while len(head) > 3:
-            out = f"{head[-3:]},{out}"
-            head = head[:-3]
+        while len(head) > _GROUP_SIZE:
+            out = f"{head[-_GROUP_SIZE:]},{out}"
+            head = head[:-_GROUP_SIZE]
         return f"{head},{out}" if head else out
     # Indian: last three, then twos.
-    head, tail = digits[:-3], digits[-3:]
+    head, tail = digits[:-_GROUP_SIZE], digits[-_GROUP_SIZE:]
     out = tail
-    while len(head) > 2:
-        out = f"{head[-2:]},{out}"
-        head = head[:-2]
+    while len(head) > _INDIAN_GROUP_SIZE:
+        out = f"{head[-_INDIAN_GROUP_SIZE:]},{out}"
+        head = head[:-_INDIAN_GROUP_SIZE]
     return f"{head},{out}" if head else out
 
 

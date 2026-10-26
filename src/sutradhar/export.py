@@ -36,6 +36,11 @@ __all__ = [
 
 _SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 
+#: RFC 5545 folds content lines at 75 octets; continuation lines carry a leading
+#: space, so each of those holds one octet less.
+_ICS_FOLD_OCTETS = 75
+_ICS_CONTINUATION_OCTETS = _ICS_FOLD_OCTETS - 1
+
 
 def _money(minor: int, plan: Plan) -> str:
     return format_minor(minor, plan.budget.currency)
@@ -429,14 +434,14 @@ def _ics_escape(text: str) -> str:
 
 
 def _ics_fold(line: str) -> str:
-    """Fold lines longer than 75 octets, as the RFC requires."""
-    if len(line) <= 75:
+    """Fold lines longer than the RFC's octet limit."""
+    if len(line) <= _ICS_FOLD_OCTETS:
         return line
-    chunks = [line[:75]]
-    rest = line[75:]
+    chunks = [line[:_ICS_FOLD_OCTETS]]
+    rest = line[_ICS_FOLD_OCTETS:]
     while rest:
-        chunks.append(" " + rest[:74])
-        rest = rest[74:]
+        chunks.append(" " + rest[:_ICS_CONTINUATION_OCTETS])
+        rest = rest[_ICS_CONTINUATION_OCTETS:]
     return "\r\n".join(chunks)
 
 

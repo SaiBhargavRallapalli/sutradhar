@@ -36,6 +36,10 @@ from .context import CostContext, cost_context
 
 __all__ = ["build_timeline", "critical_path", "topological_order"]
 
+#: Within this many days of the ideal runway a plan is feasible but worth
+#: flagging as tight.
+_TIGHT_RUNWAY_DAYS = 60
+
 
 # --------------------------------------------------------------------------- #
 # Graph helpers
@@ -358,7 +362,7 @@ def _warnings(
         )
 
     ideal_gap = profile.ideal_lead_days - ctx.lead_days
-    if is_feasible and compacted_from is None and 0 < ideal_gap <= 60:
+    if is_feasible and compacted_from is None and 0 < ideal_gap <= _TIGHT_RUNWAY_DAYS:
         out.append(
             PlanWarning(
                 code="tight_but_feasible",

@@ -28,6 +28,13 @@ __all__ = [
 ]
 
 
+#: Bands for a likelihood x impact score (1..25), lowest first. A score at or
+#: above each bound earns that severity.
+_SEVERITY_MEDIUM_AT = 6
+_SEVERITY_HIGH_AT = 12
+_SEVERITY_CRITICAL_AT = 20
+
+
 @dataclass(frozen=True, slots=True)
 class CategorySpec:
     """A budget line as authored by the catalogue, before maths is applied.
@@ -195,10 +202,10 @@ def risk(
 
 def severity_for(score: int) -> RiskLevel:
     """Map a 1..25 likelihood x impact score onto an ordinal severity band."""
-    if score >= 20:
+    if score >= _SEVERITY_CRITICAL_AT:
         return RiskLevel.CRITICAL
-    if score >= 12:
+    if score >= _SEVERITY_HIGH_AT:
         return RiskLevel.HIGH
-    if score >= 6:
+    if score >= _SEVERITY_MEDIUM_AT:
         return RiskLevel.MEDIUM
     return RiskLevel.LOW

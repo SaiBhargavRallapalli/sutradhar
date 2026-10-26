@@ -28,6 +28,9 @@ DEFAULT_ENV_FILE = ".env"
 
 _TRUE = {"1", "true", "yes", "on", "y"}
 
+#: Shortest value that can be a matched pair of surrounding quote characters.
+_MIN_QUOTED_LEN = 2
+
 
 def load_env_file(path: str | Path = DEFAULT_ENV_FILE, *, override: bool = False) -> dict[str, str]:
     """Load ``KEY=VALUE`` pairs from a dotenv-style file into ``os.environ``.
@@ -55,7 +58,7 @@ def load_env_file(path: str | Path = DEFAULT_ENV_FILE, *, override: bool = False
         key, _, value = stripped.partition("=")
         key = key.strip()
         value = value.strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+        if len(value) >= _MIN_QUOTED_LEN and value[0] == value[-1] and value[0] in {'"', "'"}:
             value = value[1:-1]
         if not key.isidentifier():
             raise AIConfigError(

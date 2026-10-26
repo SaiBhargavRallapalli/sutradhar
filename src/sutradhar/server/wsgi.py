@@ -32,6 +32,10 @@ from .static import StaticStore
 MAX_BODY_BYTES = 32 * 1024
 MAX_BRIEF_CHARS = 20_000
 
+#: Caps for free-form taste values: text length per entry, and entries per list.
+_TASTE_TEXT_LIMIT = 2_000
+_TASTE_ENTRY_LIMIT = 40
+
 _WEB_ROOT_CANDIDATES = (
     Path(__file__).resolve().parent.parent.parent / "web",
     Path(__file__).resolve().parent.parent.parent.parent / "web",
@@ -142,10 +146,10 @@ def _check_raw_limits(payload: dict[str, Any]) -> None:
     taste = payload.get("taste")
     if isinstance(taste, Mapping):
         for key, value in taste.items():
-            if isinstance(value, str) and len(value) > 2_000:
-                raise ValueError(f"taste.{key} is too long (max 2000 characters)")
-            if isinstance(value, list) and len(value) > 40:
-                raise ValueError(f"taste.{key} accepts at most 40 entries")
+            if isinstance(value, str) and len(value) > _TASTE_TEXT_LIMIT:
+                raise ValueError(f"taste.{key} is too long (max {_TASTE_TEXT_LIMIT} characters)")
+            if isinstance(value, list) and len(value) > _TASTE_ENTRY_LIMIT:
+                raise ValueError(f"taste.{key} accepts at most {_TASTE_ENTRY_LIMIT} entries")
 
 
 def _coerce_brief(payload: dict[str, Any]) -> Brief:

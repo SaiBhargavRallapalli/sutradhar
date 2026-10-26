@@ -49,6 +49,24 @@ _BAND_TOLERANCE = 0.75
 
 _EPS = 1e-9
 
+#: Lead-time breaks (days) that shrink or grow the contingency cushion. More
+#: runway means the host can shop around and absorb price rises, so needs less
+#: cushion; a tight runway needs more.
+_ROOMY_LEAD_DAYS = 240
+_COMFORTABLE_LEAD_DAYS = 120
+_TIGHT_LEAD_DAYS = 60
+
+#: Scale-exponent breaks used to explain a line in plain English: at or above the
+#: first the cost tracks guest count almost linearly, at or below the second it
+#: behaves like a fixed package.
+_LINEAR_SCALE_EXP = 0.95
+_FIXED_SCALE_EXP = 0.05
+
+#: Demand elasticity worth calling out in a rationale, and the higher bar at
+#: which peak-season pricing is worth warning about.
+_NOTABLE_ELASTICITY = 0.15
+_PEAK_ELASTICITY = 0.2
+
 
 # --------------------------------------------------------------------------- #
 # Core allocation maths
@@ -211,11 +229,11 @@ def _contingency_pct(profile: EventTypeProfile, lead_days: int) -> float:
     a price rise, so they need a bigger cushion than a host with a year up their
     sleeve.
     """
-    if lead_days >= 240:
+    if lead_days >= _ROOMY_LEAD_DAYS:
         adjustment = -1.0
-    elif lead_days >= 120:
+    elif lead_days >= _COMFORTABLE_LEAD_DAYS:
         adjustment = 0.0
-    elif lead_days >= 60:
+    elif lead_days >= _TIGHT_LEAD_DAYS:
         adjustment = 1.5
     else:
         adjustment = 3.0
@@ -335,15 +353,15 @@ def allocate_budget(
 # --------------------------------------------------------------------------- #
 def _rationale(spec: CategorySpec, ctx: CostContext, priority: Priority) -> str:
     """Explain, in one sentence, *why* a line landed where it did."""
-    if spec.scale_exp >= 0.95:
+    if spec.scale_exp >= _LINEAR_SCALE_EXP:
         basis = f"scales directly with your {ctx.guests} guests"
-    elif spec.scale_exp <= 0.05:
+    elif spec.scale_exp <= _FIXED_SCALE_EXP:
         basis = "is a fixed-price package, so it does not grow with guest count"
     else:
         basis = "grows gently with guest count"
 
     season_note = ""
-    if spec.demand_elasticity >= 0.15:
+    if spec.demand_elasticity >= _NOTABLE_ELASTICITY:
         if ctx.season is Season.PEAK:
             season_note = ", and is priced up in peak season"
         elif ctx.season is Season.OFF_PEAK:
@@ -399,7 +417,7 @@ def _warnings(
             )
         )
     elif ctx.season is Season.PEAK and any(
-        spec.demand_elasticity >= 0.2 for spec in profile.categories
+        spec.demand_elasticity >= _PEAK_ELASTICITY for spec in profile.categories
     ):
         out.append(
             PlanWarning(

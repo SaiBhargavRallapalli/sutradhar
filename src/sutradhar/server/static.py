@@ -18,6 +18,9 @@ _CTYPES = {
     ".woff2": "font/woff2",
 }
 
+#: Bodies below this size often grow when gzipped, so they are served as-is.
+_GZIP_MIN_BYTES = 512
+
 
 @dataclass(frozen=True, slots=True)
 class StaticResponse:
@@ -87,7 +90,7 @@ class StaticStore:
                 body,
             )
 
-        use_gzip = "gzip" in accept_encoding.lower() and len(asset.body) >= 512
+        use_gzip = "gzip" in accept_encoding.lower() and len(asset.body) >= _GZIP_MIN_BYTES
         base_headers: tuple[tuple[str, str], ...] = (
             ("Content-Type", asset.content_type),
             ("Cache-Control", asset.cache_control),

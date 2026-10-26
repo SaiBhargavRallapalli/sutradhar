@@ -30,6 +30,10 @@ from .models import Brief, Plan, PlanWarning
 
 __all__ = ["Planner", "plan_event"]
 
+#: At or above this guest count an event is large enough that accessibility
+#: deserves an explicit answer, even if it is not a public community event.
+_LARGE_EVENT_GUESTS = 100
+
 
 @dataclass(slots=True)
 class Planner:
@@ -121,7 +125,7 @@ def _accessibility_warning(brief: Brief) -> PlanWarning | None:
     notes = brief.taste.accessibility_notes
     if notes:
         return None
-    if brief.event_type.value != "community" and brief.guest_count < 100:
+    if brief.event_type.value != "community" and brief.guest_count < _LARGE_EVENT_GUESTS:
         return None
     return PlanWarning(
         code="accessibility_not_stated",

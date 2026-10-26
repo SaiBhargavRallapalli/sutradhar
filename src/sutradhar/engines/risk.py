@@ -25,6 +25,10 @@ _SHORT_LEAD_DAYS = 30
 #: Guest counts above this multiple of the profile's reference trigger scale risk.
 _SCALE_CREEP_RATIO = 2.0
 
+#: Below this many days, budget and overrun risk climb because there is little
+#: time left to compare quotes.
+_BUDGET_PRESSURE_LEAD_DAYS = 60
+
 
 def build_risks(
     brief: Brief,
@@ -84,7 +88,7 @@ def _contextual_pressure(
     if is_availability and ctx.season.value == "peak":
         pressure += 1
 
-    if ("budget" in text or "overrun" in text) and ctx.lead_days < 60:
+    if ("budget" in text or "overrun" in text) and ctx.lead_days < _BUDGET_PRESSURE_LEAD_DAYS:
         pressure += 1
 
     return pressure

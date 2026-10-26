@@ -51,6 +51,13 @@ _STYLES = {
     "b1": "\x1b[1m",
 }
 
+#: The demo aims at the first Sunday of June, roughly nine months out. Past this
+#: point in the year, "next June" has to mean the following calendar year.
+_DEMO_TARGET_MONTH = 6  # June, in ``date`` month numbering
+_DEMO_YEAR_CUTOFF = (_DEMO_TARGET_MONTH, 7)
+#: ``date.weekday()`` index for Sunday (Monday is 0).
+_SUNDAY = 6
+
 
 class Painter:
     """Applies ANSI colour only when the terminal can actually show it."""
@@ -378,8 +385,12 @@ def demo_brief() -> Brief:
     """The story the demo tells: a Pune wedding, tight-ish budget, eco-minded couple."""
     today = date.today()
     # Aim ~9 months out, on the first Sunday of June next year.
-    target = date(today.year + (1 if (today.month, today.day) > (6, 7) else 0), 6, 1)
-    while target.weekday() != 6:
+    target = date(
+        today.year + (1 if (today.month, today.day) > _DEMO_YEAR_CUTOFF else 0),
+        _DEMO_TARGET_MONTH,
+        1,
+    )
+    while target.weekday() != _SUNDAY:
         target += timedelta(days=1)
 
     return Brief(
