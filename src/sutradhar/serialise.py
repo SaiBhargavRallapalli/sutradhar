@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+from collections.abc import Callable
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
@@ -35,6 +36,19 @@ from pathlib import Path
 from typing import Any
 
 __all__ = ["dumps", "to_plain", "with_computed"]
+
+#: Values handed back untouched: ``json`` already understands all of them.
+_PRIMITIVES = (bool, int, float, str)
+
+#: Scalar types that need converting before ``json`` can see them, in check
+#: order. ``datetime`` precedes ``date`` because it is a subclass of it.
+_SCALAR_CONVERTERS: tuple[tuple[type, Callable[[Any], Any]], ...] = (
+    (Enum, lambda value: value.value),
+    (datetime, lambda value: value.isoformat()),
+    (date, lambda value: value.isoformat()),
+    (Decimal, float),
+    (Path, str),
+)
 
 
 def _is_dataclass_instance(obj: Any) -> bool:
@@ -73,16 +87,11 @@ def to_plain(obj: Any) -> Any:
     standard containers. Unknown objects fall back to ``str(obj)`` so a new
     field type can never crash an export.
     """
-    if obj is None or isinstance(obj, (bool, int, float, str)):
+    if obj is None or isinstance(obj, _PRIMITIVES):
         return obj
-    if isinstance(obj, Enum):
-        return obj.value
-    if isinstance(obj, (datetime, date)):
-        return obj.isoformat()
-    if isinstance(obj, Decimal):
-        return float(obj)
-    if isinstance(obj, Path):
-        return str(obj)
+    for kind, convert in _SCALAR_CONVERTERS:
+        if isinstance(obj, kind):
+            return convert(obj)
     if _is_dataclass_instance(obj):
         # Nested models go through `with_computed` too, so a derived value on a
         # child (RiskItem.score, BudgetLine.amount) survives to the top level.

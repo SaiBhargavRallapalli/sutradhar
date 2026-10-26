@@ -22,6 +22,7 @@ All money is handled in integer minor units. See :mod:`sutradhar.money`.
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from datetime import date
 
 from ..catalog.specs import CategorySpec, EventTypeProfile
@@ -52,6 +53,64 @@ _EPS = 1e-9
 # --------------------------------------------------------------------------- #
 # Core allocation maths
 # --------------------------------------------------------------------------- #
+@dataclass(slots=True)
+class _WaterFill:
+    """Mutable state for one bounded water-filling pass.
+
+    Separating the state from the loop keeps each step (pin, release, assign)
+    small enough to read and test on its own.
+    """
+
+    shares: list[float]
+    lows: list[float]
+    highs: list[float]
+    fixed: list[float | None]
+    remaining: float = 1.0
+
+    @property
+    def free(self) -> list[int]:
+        """Indices not yet pinned to a bound."""
+        return [i for i, value in enumerate(self.fixed) if value is None]
+
+    def total_weight(self, free: list[int]) -> float:
+        return sum(self.shares[i] for i in free)
+
+    def pin_out_of_band(self, free: list[int], total_weight: float) -> list[int]:
+        """Pin any free category outside its band; return the pinned indices."""
+        clamped: list[int] = []
+        for i in free:
+            candidate = self.remaining * self.shares[i] / total_weight
+            if candidate < self.lows[i] - _EPS:
+                self.fixed[i] = self.lows[i]
+                clamped.append(i)
+            elif candidate > self.highs[i] + _EPS:
+                self.fixed[i] = self.highs[i]
+                clamped.append(i)
+        return clamped
+
+    def assign(self, free: list[int], total_weight: float) -> None:
+        """Assign the remaining budget proportionally across ``free``."""
+        for i in free:
+            self.fixed[i] = self.remaining * self.shares[i] / total_weight
+
+    def assign_evenly(self, free: list[int]) -> None:
+        """Split the remainder evenly (used when no weight signal is left)."""
+        per = self.remaining / len(free)
+        for i in free:
+            self.fixed[i] = per
+
+    def release(self, clamped: list[int]) -> None:
+        """Give back the budget pinned by the last pass."""
+        for i in clamped:
+            self.remaining -= self.fixed[i] or 0.0
+
+    def pin_floors(self, free: list[int]) -> None:
+        """Pin everything still free at its floor (over-subscribed bands)."""
+        for i in free:
+            if self.fixed[i] is None:
+                self.fixed[i] = self.lows[i]
+
+
 def bounded_shares(
     shares: list[float],
     lows: list[float],
@@ -74,61 +133,45 @@ def bounded_shares(
     highs = [max(hi, lo) for hi, lo in zip(highs, lows, strict=True)]
 
     feasible = (sum(lows) <= 1.0 + _EPS) and (sum(highs) >= 1.0 - _EPS)
-
-    fixed: list[float | None] = [None] * n
-    remaining = 1.0
+    state = _WaterFill(shares, lows, highs, [None] * n)
 
     for _ in range(n + 1):
-        free = [i for i in range(n) if fixed[i] is None]
+        free = state.free
         if not free:
             break
 
-        total_weight = sum(shares[i] for i in free)
+        total_weight = state.total_weight(free)
         if total_weight <= _EPS:
-            # No signal left; split the remainder evenly across the free slots.
-            per = remaining / len(free)
-            for i in free:
-                fixed[i] = per
+            state.assign_evenly(free)
             break
 
-        clamped: list[int] = []
-        for i in free:
-            candidate = remaining * shares[i] / total_weight
-            if candidate < lows[i] - _EPS:
-                fixed[i] = lows[i]
-                clamped.append(i)
-            elif candidate > highs[i] + _EPS:
-                fixed[i] = highs[i]
-                clamped.append(i)
-
+        clamped = state.pin_out_of_band(free, total_weight)
         if not clamped:
-            for i in free:
-                fixed[i] = remaining * shares[i] / total_weight
+            state.assign(free, total_weight)
             break
 
-        for i in clamped:
-            remaining -= fixed[i] or 0.0
-        if remaining < -_EPS:
+        state.release(clamped)
+        if state.remaining < -_EPS:
             # The bands over-subscribe the budget; pin what is left at its floor.
             # The epsilon matters: clamping to a high of 0.9 leaves
             # `remaining == 0.09999999999999998`, and subtracting a low of 0.1
             # gives a tiny negative residue. Without the tolerance that reads as
             # over-subscription and wrongly reports feasible bands as infeasible.
-            for i in free:
-                if fixed[i] is None:
-                    fixed[i] = lows[i]
+            state.pin_floors(free)
             feasible = False
             break
 
-    result = [float(value or 0.0) for value in fixed]
+    result = [float(value or 0.0) for value in state.fixed]
+    _absorb_drift(result, n)
+    return [max(0.0, value) for value in result], feasible
 
-    # Absorb float drift into the largest element so the vector sums to exactly 1.
+
+def _absorb_drift(result: list[float], n: int) -> None:
+    """Push float residue into the largest element so the vector sums to 1."""
     total = sum(result)
     if total > 0 and abs(total - 1.0) > _EPS:
         biggest = max(range(n), key=result.__getitem__)
         result[biggest] += 1.0 - total
-
-    return [max(0.0, value) for value in result], feasible
 
 
 def allocate_minor(total_minor: int, fractions: list[float]) -> list[int]:

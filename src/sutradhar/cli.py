@@ -99,17 +99,159 @@ def _money(minor: int, currency: Currency) -> str:
     return format_minor(minor, currency)
 
 
+#: Severity label -> terminal colour style. Critical and high both read red;
+#: medium is yellow; low is dim.
+_SEVERITY_STYLE = {"critical": "r", "high": "r", "medium": "y", "low": "d"}
+
+
+def _severity_style(severity: str) -> str:
+    """Map a severity label to a terminal colour style (``""`` if unknown)."""
+    return _SEVERITY_STYLE.get(severity, "")
+
+
 # ---------------------------------------------------------------------------
 # Plan rendering
 # ---------------------------------------------------------------------------
 def render_plan(plan: Plan, p: Painter) -> list[str]:
-    """Human-readable plan rendering shared by ``demo``, ``plan`` and ``brief``."""
-    out: list[str] = []
-    b, money = plan.brief, plan.brief.currency
+    """Human-readable plan rendering shared by ``demo``, ``plan`` and ``brief``.
 
+    Each section lives in its own small helper so the ordering is visible at a
+    glance and a renderer can be tested (or reused) in isolation.
+    """
+    out: list[str] = []
+    out.extend(_render_header(plan, p))
+
+    # -- Budget ------------------------------------------------------------
+    out.extend(_render_budget(plan, p))
+
+    # -- Timeline ----------------------------------------------------------
+    out.extend(_render_timeline(plan, p))
+
+    # -- Vendors -----------------------------------------------------------
+    out.extend(_render_vendors(plan, p))
+
+    # -- Risks -------------------------------------------------------------
+    out.extend(_render_risks(plan, p))
+
+    # -- Ideas -------------------------------------------------------------
+    out.extend(_render_ideas(plan, p))
+
+    # -- Worth knowing -----------------------------------------------------
+    out.extend(_render_warnings(plan, p))
+
+    # -- Footer ------------------------------------------------------------
+    out.extend(_render_footer(plan, p))
+    return out
+
+
+def _render_vendors(plan: Plan, p: Painter) -> list[str]:
+    """The vendor section: who to book, when, and the dated cash-flow plan."""
+    money = plan.brief.currency
+    out = [_rule(p, f"Vendors ({len(plan.vendors.items)} categories)")]
+    for v in sorted(plan.vendors.items, key=lambda v: v.book_by):
+        label = v.label[:30].ljust(30)
+        out.append(
+            "  "
+            + p.p("b1", label)
+            + " "
+            + p.p("c", f"{v.deposit_pct:.0f}% deposit")
+            + p.p("d", f"  book by {v.book_by:%d %b %Y}")
+        )
+        out.extend(_wrap(v.why, indent="        "))
+        if v.negotiation_tip:
+            out.append(p.p("g", "        tip: ") + v.negotiation_tip)
+    if plan.vendors.milestones:
+        out.append("")
+        out.append(f"  Cash flow - {len(plan.vendors.milestones)} dated payments:")
+        for m in plan.vendors.milestones[:8]:
+            out.append(
+                f"    {m.due:%d %b %Y}  {m.label[:34]:<34} "
+                + p.p("c", _money(m.amount_minor, money).rjust(14))
+            )
+        out.append(
+            "    "
+            + p.p("d", "deposits total: ")
+            + p.p("c", _money(plan.vendors.deposit_total_minor, money))
+        )
     out.append("")
-    out.append(_rule(p, f"{b.event_type.value.upper()} - {b.display_title}"))
+    return out
+
+
+def _render_risks(plan: Plan, p: Painter) -> list[str]:
+    """The risk section: the top scored risks and how to mitigate each."""
+    if not plan.risks.items:
+        return []
+    out = [_rule(p, "Top risks")]
+    for r in plan.risks.top(4):
+        sev_style = _severity_style(r.severity.value)
+        out.append(
+            "  "
+            + p.p(sev_style, f"[{r.severity.value.upper():<8}]")
+            + f" {r.title} "
+            + p.p("d", f"(likelihood {r.likelihood}/5 x impact {r.impact}/5)")
+        )
+        out.extend(_wrap(r.mitigation, indent="        "))
+        if r.trigger_sign:
+            out.append(p.p("d", f"        watch for: {r.trigger_sign}"))
     out.append("")
+    return out
+
+
+def _render_ideas(plan: Plan, p: Painter) -> list[str]:
+    """The ideas section, with provenance and the grounded cost delta."""
+    if not plan.ideas:
+        return []
+    out = [_rule(p, "Personalised ideas")]
+    for idea in plan.ideas:
+        src = "model" if idea.source.value == "model" else "catalogue"
+        out.append("  " + p.p("m", f"* {idea.name}") + p.p("d", f"  [{src}]"))
+        out.extend(_wrap(idea.tagline, indent="      "))
+        if idea.palette:
+            out.append(p.p("d", "      palette: ") + ", ".join(idea.palette))
+        if idea.decor:
+            out.extend(_wrap(f"Decor: {idea.decor}", indent="      "))
+        if idea.menu:
+            out.extend(_wrap(f"Menu: {idea.menu}", indent="      "))
+        delta = idea.estimated_delta_pct
+        delta_s = f"{delta:+.1f}%" if delta else "no change"
+        out.append(p.p("d", "      cost: ") + f"{delta_s} - {idea.cost_fit}")
+        if idea.rationale:
+            out.append(p.p("d", "      why you: ") + idea.rationale)
+    out.append("")
+    return out
+
+
+def _render_warnings(plan: Plan, p: Painter) -> list[str]:
+    """Plan-level warnings, excluding risks that already have their own section."""
+    other = [w for w in plan.all_warnings if w.section != "risks"]
+    if not other:
+        return []
+    out = [_rule(p, "Worth knowing")]
+    for w in other:
+        out.append("  " + p.p(_severity_style(w.severity.value), "!") + f" {w.message}")
+        if w.suggestion:
+            out.extend(_wrap(w.suggestion, indent="      "))
+    out.append("")
+    return out
+
+
+def _render_footer(plan: Plan, p: Painter) -> list[str]:
+    """The one-line provenance footer."""
+    used = " (used)" if plan.ai_used else ""
+    return [
+        _rule(p),
+        p.p(
+            "d",
+            f"  {len(plan.timeline.tasks)} tasks · {len(plan.vendors.items)} vendor categories · "
+            f"{len(plan.ideas)} ideas · ai: {plan.ai_provider}{used}",
+        ),
+    ]
+
+
+def _render_header(plan: Plan, p: Painter) -> list[str]:
+    """The title block: who, what, when, where and the total budget."""
+    b = plan.brief
+    out = ["", _rule(p, f"{b.event_type.value.upper()} - {b.display_title}"), ""]
     out.append(_kv(p, "Event", f"{b.event_date:%A %d %B %Y}"))
     out.append(_kv(p, "Guests", f"{b.guest_count}"))
     out.append(
@@ -118,62 +260,14 @@ def render_plan(plan: Plan, p: Painter) -> list[str]:
     out.append(_kv(p, "Setting", b.setting.value))
     if b.host_name:
         out.append(_kv(p, "Host", b.host_name))
-    out.append(_kv(p, "Total budget", _money(b.budget_total_minor, money), "b1"))
+    out.append(_kv(p, "Total budget", _money(b.budget_total_minor, b.currency), "b1"))
     out.append("")
+    return out
 
-    # -- Budget ------------------------------------------------------------
-    out.append(_rule(p, "Budget"))
-    budget = plan.budget
-    biggest = max((ln.amount_minor for ln in budget.lines), default=1) or 1
-    for line in sorted(budget.lines, key=lambda ln: ln.amount_minor, reverse=True):
-        name = line.label[:26].ljust(26)
-        amount = _money(line.amount_minor, money).rjust(14)
-        frac = line.amount_minor / biggest
-        flag = "" if line.in_band else "  <-- outside benchmark"
-        out.append(
-            "  "
-            + p.p("b1", name)
-            + " "
-            + _bar(p, frac, 18)
-            + " "
-            + p.p("c", amount)
-            + p.p("d", f"  {line.pct:4.1f}%")
-            + p.p("y", flag)
-        )
-    out.append("  " + p.p("d", "-" * 68))
-    out.append(
-        "  "
-        + p.p("d", f"{'spendable'.ljust(26)}")
-        + _money(budget.spendable_minor, money).rjust(24)
-    )
-    out.append(
-        "  "
-        + p.p("d", f"{'contingency float'.ljust(26)}")
-        + _money(budget.contingency_minor, money).rjust(24)
-        + p.p("d", f"  ({budget.contingency_pct:.1f}%)")
-    )
-    out.append(
-        "  "
-        + p.p("d", f"{'unallocated'.ljust(26)}")
-        + p.p("g", _money(budget.unallocated_minor, money).rjust(24))
-        + p.p("d", "  <- always 0, by construction")
-    )
-    if budget.lines:
-        per_guest = budget.per_guest_minor
-        out.append(_kv(p, "Per guest", _money(per_guest, money)))
-    if budget.trade_offs:
-        out.append("")
-        out.append("  If you need to free up cash, in order of least harm:")
-        for t in budget.trade_offs[:3]:
-            saving = p.p("g", f"+{_money(t.saving_minor, money)}")
-            out.append(
-                f"    {saving}  {t.action} {t.category_label} {p.p('d', f'[impact: {t.impact.value}]')}"
-            )
-            out.extend(_wrap(t.consequence, indent="        "))
-    out.append("")
 
-    # -- Timeline ----------------------------------------------------------
-    out.append(_rule(p, "Timeline"))
+def _render_timeline(plan: Plan, p: Painter) -> list[str]:
+    """The timeline section: lead time, critical chain, upcoming work, run sheet."""
+    out = [_rule(p, "Timeline")]
     tl = plan.timeline
     out.append(_kv(p, "Planning window", f"{tl.lead_days} days before the event"))
     out.append(
@@ -220,99 +314,60 @@ def render_plan(plan: Plan, p: Painter) -> list[str]:
             day = "" if slot.day_offset == 0 else f" (day {slot.day_offset:+d})"
             out.append(f"    {slot.start:%H:%M}-{slot.end:%H:%M}{day}  {slot.title}")
     out.append("")
+    return out
 
-    # -- Vendors -----------------------------------------------------------
-    out.append(_rule(p, f"Vendors ({len(plan.vendors.items)} categories)"))
-    for v in sorted(plan.vendors.items, key=lambda v: v.book_by):
-        label = v.label[:30].ljust(30)
+
+def _render_budget(plan: Plan, p: Painter) -> list[str]:
+    """The budget section: bars, exact reconciliation, and costed trade-offs."""
+    money = plan.brief.currency
+    out = [_rule(p, "Budget")]
+    budget = plan.budget
+    biggest = max((ln.amount_minor for ln in budget.lines), default=1) or 1
+    for line in sorted(budget.lines, key=lambda ln: ln.amount_minor, reverse=True):
+        name = line.label[:26].ljust(26)
+        amount = _money(line.amount_minor, money).rjust(14)
+        frac = line.amount_minor / biggest
+        flag = "" if line.in_band else "  <-- outside benchmark"
         out.append(
             "  "
-            + p.p("b1", label)
+            + p.p("b1", name)
             + " "
-            + p.p("c", f"{v.deposit_pct:.0f}% deposit")
-            + p.p("d", f"  book by {v.book_by:%d %b %Y}")
+            + _bar(p, frac, 18)
+            + " "
+            + p.p("c", amount)
+            + p.p("d", f"  {line.pct:4.1f}%")
+            + p.p("y", flag)
         )
-        out.extend(_wrap(v.why, indent="        "))
-        if v.negotiation_tip:
-            out.append(p.p("g", "        tip: ") + v.negotiation_tip)
-    if plan.vendors.milestones:
-        out.append("")
-        out.append(f"  Cash flow - {len(plan.vendors.milestones)} dated payments:")
-        for m in plan.vendors.milestones[:8]:
-            out.append(
-                f"    {m.due:%d %b %Y}  {m.label[:34]:<34} "
-                + p.p("c", _money(m.amount_minor, money).rjust(14))
-            )
-        out.append(
-            "    "
-            + p.p("d", "deposits total: ")
-            + p.p("c", _money(plan.vendors.deposit_total_minor, money))
-        )
-    out.append("")
-
-    # -- Risks -------------------------------------------------------------
-    if plan.risks.items:
-        out.append(_rule(p, "Top risks"))
-        for r in plan.risks.top(4):
-            sev_style = {"critical": "r", "high": "r", "medium": "y", "low": "d"}.get(
-                r.severity.value, ""
-            )
-            out.append(
-                "  "
-                + p.p(sev_style, f"[{r.severity.value.upper():<8}]")
-                + f" {r.title} "
-                + p.p("d", f"(likelihood {r.likelihood}/5 x impact {r.impact}/5)")
-            )
-            out.extend(_wrap(r.mitigation, indent="        "))
-            if r.trigger_sign:
-                out.append(p.p("d", f"        watch for: {r.trigger_sign}"))
-        out.append("")
-
-    # -- Ideas -------------------------------------------------------------
-    if plan.ideas:
-        out.append(_rule(p, "Personalised ideas"))
-        for idea in plan.ideas:
-            src = "model" if idea.source.value == "model" else "catalogue"
-            out.append("  " + p.p("m", f"* {idea.name}") + p.p("d", f"  [{src}]"))
-            out.extend(_wrap(idea.tagline, indent="      "))
-            if idea.palette:
-                out.append(p.p("d", "      palette: ") + ", ".join(idea.palette))
-            if idea.decor:
-                out.extend(_wrap(f"Decor: {idea.decor}", indent="      "))
-            if idea.menu:
-                out.extend(_wrap(f"Menu: {idea.menu}", indent="      "))
-            delta = idea.estimated_delta_pct
-            delta_s = f"{delta:+.1f}%" if delta else "no change"
-            out.append(p.p("d", "      cost: ") + f"{delta_s} - {idea.cost_fit}")
-            if idea.rationale:
-                out.append(p.p("d", "      why you: ") + idea.rationale)
-        out.append("")
-
-    # -- Worth knowing -----------------------------------------------------
-    # Risk items already have their own section above, so skip the mirrored
-    # warnings rather than making the host read the same thing twice.
-    other = [w for w in plan.all_warnings if w.section != "risks"]
-    if other:
-        out.append(_rule(p, "Worth knowing"))
-        for w in other:
-            style = {"critical": "r", "high": "r", "medium": "y", "low": "d"}.get(
-                w.severity.value, ""
-            )
-            out.append("  " + p.p(style, "!") + f" {w.message}")
-            if w.suggestion:
-                out.extend(_wrap(w.suggestion, indent="      "))
-        out.append("")
-
-    # -- Footer ------------------------------------------------------------
-    out.append(_rule(p))
+    out.append("  " + p.p("d", "-" * 68))
     out.append(
-        p.p(
-            "d",
-            f"  {len(plan.timeline.tasks)} tasks · {len(plan.vendors.items)} vendor categories · "
-            f"{len(plan.ideas)} ideas · ai: {plan.ai_provider}"
-            f"{'' if not plan.ai_used else ' (used)'}",
-        )
+        "  "
+        + p.p("d", f"{'spendable'.ljust(26)}")
+        + _money(budget.spendable_minor, money).rjust(24)
     )
+    out.append(
+        "  "
+        + p.p("d", f"{'contingency float'.ljust(26)}")
+        + _money(budget.contingency_minor, money).rjust(24)
+        + p.p("d", f"  ({budget.contingency_pct:.1f}%)")
+    )
+    out.append(
+        "  "
+        + p.p("d", f"{'unallocated'.ljust(26)}")
+        + p.p("g", _money(budget.unallocated_minor, money).rjust(24))
+        + p.p("d", "  <- always 0, by construction")
+    )
+    if budget.lines:
+        out.append(_kv(p, "Per guest", _money(budget.per_guest_minor, money)))
+    if budget.trade_offs:
+        out.append("")
+        out.append("  If you need to free up cash, in order of least harm:")
+        for t in budget.trade_offs[:3]:
+            saving = p.p("g", f"+{_money(t.saving_minor, money)}")
+            out.append(
+                f"    {saving}  {t.action} {t.category_label} {p.p('d', f'[impact: {t.impact.value}]')}"
+            )
+            out.extend(_wrap(t.consequence, indent="        "))
+    out.append("")
     return out
 
 

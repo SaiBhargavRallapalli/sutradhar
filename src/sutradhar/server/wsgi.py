@@ -22,7 +22,7 @@ from ..ai.resilience import ResilientProvider
 from ..config import Settings, load_settings
 from ..exceptions import SutradharError
 from ..inputs import brief_from_dict
-from ..models import Brief
+from ..models import Brief, Plan
 from ..pipeline import plan_event
 from ..version import __version__
 from .limits import RateLimiter
@@ -233,11 +233,25 @@ class Application:
         return _json_response(200, payload)
 
     def _plan(self, environ: dict[str, Any]) -> Response:
-        if not is_same_origin(environ):
-            return _error(403, "cross-site requests are not allowed")
-        if _content_type(environ) != "application/json":
-            return _error(415, "unsupported media type", "send Content-Type: application/json")
+        response = _check_origin_and_type(environ)
+        if response is not None:
+            return response
 
+        response = self._check_rate_limits(environ)
+        if response is not None:
+            return response
+
+        parsed = _parse_brief(environ)
+        if isinstance(parsed, Response):
+            return parsed
+
+        plan = self._build_plan(parsed)
+        if isinstance(plan, Response):
+            return plan
+        return _json_response(200, {"ok": True, "plan": plan.to_dict()})
+
+    def _check_rate_limits(self, environ: Mapping[str, Any]) -> Response | None:
+        """Apply the general request limit, then the tighter model limit."""
         client = client_key(environ)
         decision = self.request_limiter.check(client)
         if not decision.allowed:
@@ -256,29 +270,12 @@ class Application:
                     "continue later; offline planning remains available",
                     extra=(("Retry-After", str(model_decision.retry_after)),),
                 )
+        return None
 
-        body_or_error = _read_body(environ)
-        if isinstance(body_or_error, Response):
-            return body_or_error
+    def _build_plan(self, brief: Brief) -> Plan | Response:
+        """Run the planner, turning an unexpected failure into a 500 response."""
         try:
-            text = body_or_error.decode("utf-8")
-        except UnicodeDecodeError:
-            return _error(400, "request body is not valid UTF-8")
-        if len(text) > MAX_BRIEF_CHARS:
-            return _error(413, f"brief too long (max {MAX_BRIEF_CHARS} characters)")
-        try:
-            payload = json.loads(text)
-        except json.JSONDecodeError as exc:
-            return _error(400, f"invalid JSON: {exc.msg}", "check for trailing commas or quotes")
-        if not isinstance(payload, dict):
-            return _error(400, "expected a JSON object at the top level")
-
-        try:
-            brief = _coerce_brief(cast(dict[str, Any], payload))
-        except (ValueError, SutradharError) as exc:
-            return _error(422, redact(str(exc)), "see the Brief fields in the README")
-        try:
-            plan = plan_event(
+            return plan_event(
                 brief,
                 settings=self.settings,
                 today=date.today(),
@@ -287,7 +284,47 @@ class Application:
         except Exception as exc:  # pragma: no cover - defensive domain boundary
             self.echo(f"plan failed: {type(exc).__name__}")
             return _error(500, "planning failed", "the server logged the request ID")
-        return _json_response(200, {"ok": True, "plan": plan.to_dict()})
+
+
+def _check_origin_and_type(environ: Mapping[str, Any]) -> Response | None:
+    """Reject cross-site requests and non-JSON bodies before reading anything."""
+    if not is_same_origin(environ):
+        return _error(403, "cross-site requests are not allowed")
+    if _content_type(environ) != "application/json":
+        return _error(415, "unsupported media type", "send Content-Type: application/json")
+    return None
+
+
+def _parse_brief(environ: Mapping[str, Any]) -> Brief | Response:
+    """Read, decode and validate the request body into a Brief (or an error response)."""
+    body = _read_body(environ)
+    if isinstance(body, Response):
+        return body
+    try:
+        text = body.decode("utf-8")
+    except UnicodeDecodeError:
+        return _error(400, "request body is not valid UTF-8")
+
+    payload = _decode_payload(text)
+    if isinstance(payload, Response):
+        return payload
+    try:
+        return _coerce_brief(payload)
+    except (ValueError, SutradharError) as exc:
+        return _error(422, redact(str(exc)), "see the Brief fields in the README")
+
+
+def _decode_payload(text: str) -> dict[str, Any] | Response:
+    """Check the length and decode a JSON object, or explain why it cannot be."""
+    if len(text) > MAX_BRIEF_CHARS:
+        return _error(413, f"brief too long (max {MAX_BRIEF_CHARS} characters)")
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        return _error(400, f"invalid JSON: {exc.msg}", "check for trailing commas or quotes")
+    if not isinstance(payload, dict):
+        return _error(400, "expected a JSON object at the top level")
+    return cast(dict[str, Any], payload)
 
 
 def _content_type(environ: Mapping[str, Any]) -> str:

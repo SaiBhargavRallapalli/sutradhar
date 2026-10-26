@@ -22,7 +22,7 @@ import io
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-from .models import Plan
+from .models import Plan, VendorItem
 from .money import format_minor
 
 __all__ = [
@@ -37,10 +37,6 @@ __all__ = [
 _SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 
 
-def _symbol(plan: Plan) -> str:
-    return plan.budget.currency.info.symbol
-
-
 def _money(minor: int, plan: Plan) -> str:
     return format_minor(minor, plan.budget.currency)
 
@@ -50,11 +46,37 @@ def _money(minor: int, plan: Plan) -> str:
 # --------------------------------------------------------------------------- #
 def to_markdown(plan: Plan) -> str:
     """Render the whole plan as a Markdown document."""
+    out: list[str] = []
+    out.extend(_md_overview(plan))
+
+    # -- Warnings ---------------------------------------------------------- #
+    out.extend(_md_warnings(plan))
+
+    # -- Budget ------------------------------------------------------------ #
+    out.extend(_md_budget(plan))
+
+    # -- Timeline ---------------------------------------------------------- #
+    out.extend(_md_timeline(plan))
+
+    # -- Vendors ----------------------------------------------------------- #
+    out.extend(_md_vendors(plan))
+
+    # -- Risks ------------------------------------------------------------- #
+    out.extend(_md_risks(plan))
+
+    # -- Ideas ------------------------------------------------------------- #
+    out.extend(_md_ideas(plan))
+
+    # -- Provenance -------------------------------------------------------- #
+    out.extend(_md_provenance(plan))
+    return "\n".join(out)
+
+
+def _md_overview(plan: Plan) -> list[str]:
+    """Title, one-line summary and the at-a-glance table."""
     brief = plan.brief
     budget = plan.budget
     timeline = plan.timeline
-    _symbol(plan)
-
     out: list[str] = []
     out.append(f"# {brief.display_title}")
     out.append("")
@@ -64,8 +86,6 @@ def to_markdown(plan: Plan) -> str:
         f"{brief.guest_count:,} guests."
     )
     out.append("")
-
-    # -- At a glance ------------------------------------------------------- #
     out.append("## At a glance")
     out.append("")
     out.append("| | |")
@@ -85,29 +105,38 @@ def to_markdown(plan: Plan) -> str:
         f"({plan.ai_provider}) |"
     )
     out.append("")
+    return out
 
-    # -- Warnings ---------------------------------------------------------- #
+
+def _md_warnings(plan: Plan) -> list[str]:
+    """Plan-level warnings, most severe first."""
     warnings = sorted(
         plan.all_warnings,
         key=lambda w: (_SEVERITY_ORDER.get(w.severity.value, 9), w.section, w.code),
     )
-    if warnings:
-        out.append("## What to watch")
-        out.append("")
-        for warning in warnings:
-            icon = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🔵"}.get(
-                warning.severity.value, "•"
-            )
-            out.append(f"- {icon} **{warning.message}**")
-            if warning.suggestion:
-                out.append(f"  - _{warning.suggestion}_")
-        out.append("")
-
-    # -- Budget ------------------------------------------------------------ #
-    out.append("## Budget")
+    if not warnings:
+        return []
+    out = ["## What to watch", ""]
+    for warning in warnings:
+        icon = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🔵"}.get(
+            warning.severity.value, "•"
+        )
+        out.append(f"- {icon} **{warning.message}**")
+        if warning.suggestion:
+            out.append(f"  - _{warning.suggestion}_")
     out.append("")
-    out.append("| Category | Amount | % of spendable | Per guest | Why |")
-    out.append("|---|---:|---:|---:|---|")
+    return out
+
+
+def _md_budget(plan: Plan) -> list[str]:
+    """Budget table, contingency row and costed trade-offs."""
+    budget = plan.budget
+    out = [
+        "## Budget",
+        "",
+        "| Category | Amount | % of spendable | Per guest | Why |",
+        "|---|---:|---:|---:|---|",
+    ]
     for line in budget.lines:
         out.append(
             f"| {line.label} | {_money(line.amount_minor, plan)} | {line.pct:.1f}% "
@@ -118,7 +147,6 @@ def to_markdown(plan: Plan) -> str:
         f"| {budget.contingency_pct:.1f}% | | Unplanned extras and price rises |"
     )
     out.append("")
-
     if budget.trade_offs:
         out.append("### Trade-offs if you need to free up cash")
         out.append("")
@@ -130,16 +158,18 @@ def to_markdown(plan: Plan) -> str:
             for step in trade.steps:
                 out.append(f"  - {step}")
         out.append("")
+    return out
 
-    # -- Timeline ---------------------------------------------------------- #
-    out.append("## Timeline")
-    out.append("")
+
+def _md_timeline(plan: Plan) -> list[str]:
+    """Task table (with slack and the critical marker) and the run of show."""
+    timeline = plan.timeline
+    out = ["## Timeline", ""]
     if timeline.critical_path:
         out.append(
             "**Critical path (do these first, in order):** " + " → ".join(timeline.critical_path)
         )
         out.append("")
-
     out.append("| Due | Task | Owner | Phase | Days | Slack |")
     out.append("|---|---|---|---|---:|---:|")
     for task in timeline.tasks:
@@ -150,7 +180,6 @@ def to_markdown(plan: Plan) -> str:
             f"| {task.phase} | {task.duration_days} | {slack} |"
         )
     out.append("")
-
     if timeline.run_of_show:
         out.append("### Run of show")
         out.append("")
@@ -168,93 +197,116 @@ def to_markdown(plan: Plan) -> str:
                 f"| {slot.owner.value} | {slot.notes} |"
             )
         out.append("")
+    return out
 
-    # -- Vendors ----------------------------------------------------------- #
-    out.append("## Vendor checklist")
-    out.append("")
+
+def _md_vendors(plan: Plan) -> list[str]:
+    """Per-vendor checklists and the dated payment schedule."""
+    out = ["## Vendor checklist", ""]
     for item in plan.vendors.items:
-        out.append(f"### {item.label} _(book by {item.book_by:%d %b %Y})_")
-        out.append("")
-        out.append(f"{item.why}")
-        out.append("")
-        out.append(f"- **Priority:** {item.priority.value}")
-        out.append(f"- **Typical deposit:** {item.deposit_pct:.0f}%")
-        if item.negotiation_tip:
-            out.append(f"- **Negotiating:** {item.negotiation_tip}")
-        if item.contract_musts:
-            out.append("- **Must be in the contract:**")
-            for must in item.contract_musts:
-                out.append(f"  - {must}")
-        if item.red_flags:
-            out.append("- **Red flags:**")
-            for flag in item.red_flags:
-                out.append(f"  - ⚠️ {flag}")
-        if item.questions:
-            out.append("- **Ask them:**")
-            for question in item.questions:
-                out.append(f"  - {question}")
-        out.append("")
-
+        out.extend(_md_vendor_card(item))
     if plan.vendors.milestones:
-        out.append("### Payment schedule")
-        out.append("")
-        out.append("| Due | Vendor | Payment | % | Amount |")
-        out.append("|---|---|---|---:|---:|")
-        for milestone in plan.vendors.milestones:
-            out.append(
-                f"| {milestone.due:%d %b %Y} | {milestone.vendor_key.title()} "
-                f"| {milestone.label} | {milestone.pct:.0f}% "
-                f"| {_money(milestone.amount_minor, plan)} |"
-            )
-        out.append("")
+        out.extend(_md_payment_schedule(plan))
+    return out
 
-    # -- Risks ------------------------------------------------------------- #
-    out.append("## Risk register")
+
+def _md_vendor_card(item: VendorItem) -> list[str]:
+    """One vendor: why they matter, what to negotiate, and the paperwork to demand."""
+    out = [f"### {item.label} _(book by {item.book_by:%d %b %Y})_", "", item.why, ""]
+    out.append(f"- **Priority:** {item.priority.value}")
+    out.append(f"- **Typical deposit:** {item.deposit_pct:.0f}%")
+    if item.negotiation_tip:
+        out.append(f"- **Negotiating:** {item.negotiation_tip}")
+    if item.contract_musts:
+        out.append("- **Must be in the contract:**")
+        out.extend(f"  - {must}" for must in item.contract_musts)
+    if item.red_flags:
+        out.append("- **Red flags:**")
+        out.extend(f"  - ⚠️ {flag}" for flag in item.red_flags)
+    if item.questions:
+        out.append("- **Ask them:**")
+        out.extend(f"  - {question}" for question in item.questions)
     out.append("")
-    out.append("| Risk | Score | Severity | Watch for | Mitigation |")
-    out.append("|---|---:|---|---|---|")
+    return out
+
+
+def _md_payment_schedule(plan: Plan) -> list[str]:
+    """Every dated payment, so the cash-flow shape is visible before the day."""
+    out = [
+        "### Payment schedule",
+        "",
+        "| Due | Vendor | Payment | % | Amount |",
+        "|---|---|---|---:|---:|",
+    ]
+    for milestone in plan.vendors.milestones:
+        out.append(
+            f"| {milestone.due:%d %b %Y} | {milestone.vendor_key.title()} "
+            f"| {milestone.label} | {milestone.pct:.0f}% "
+            f"| {_money(milestone.amount_minor, plan)} |"
+        )
+    out.append("")
+    return out
+
+
+def _md_risks(plan: Plan) -> list[str]:
+    """The scored risk register as a table."""
+    out = [
+        "## Risk register",
+        "",
+        "| Risk | Score | Severity | Watch for | Mitigation |",
+        "|---|---:|---|---|---|",
+    ]
     for risk in plan.risks.items:
         out.append(
             f"| {risk.title} | {risk.score} | {risk.severity.value} "
             f"| {risk.trigger_sign or '—'} | {risk.mitigation} |"
         )
     out.append("")
+    return out
 
-    # -- Ideas ------------------------------------------------------------- #
-    if plan.ideas:
-        out.append("## Personalised ideas")
+
+def _md_ideas(plan: Plan) -> list[str]:
+    """Grounded concept cards, including their provenance."""
+    if not plan.ideas:
+        return []
+    out = ["## Personalised ideas", ""]
+    for idea in plan.ideas:
+        out.append(f"### {idea.name}")
         out.append("")
-        for idea in plan.ideas:
-            out.append(f"### {idea.name}")
-            out.append("")
-            out.append(f"_{idea.tagline}_")
-            out.append("")
-            if idea.palette:
-                out.append(f"- **Palette:** {', '.join(idea.palette)}")
-            for label, value in (
-                ("Decor", idea.decor),
-                ("Menu", idea.menu),
-                ("Attire", idea.attire),
-                ("Music", idea.music),
-                ("Activities", idea.activities),
-                ("Favors", idea.favors),
-            ):
-                if value:
-                    out.append(f"- **{label}:** {value}")
-            out.append(f"- **Budget fit:** {idea.cost_fit}")
-            out.append(f"- **Source:** {idea.source.value}")
-            out.append("")
+        out.append(f"_{idea.tagline}_")
+        out.append("")
+        if idea.palette:
+            out.append(f"- **Palette:** {', '.join(idea.palette)}")
+        for label, value in (
+            ("Decor", idea.decor),
+            ("Menu", idea.menu),
+            ("Attire", idea.attire),
+            ("Music", idea.music),
+            ("Activities", idea.activities),
+            ("Favors", idea.favors),
+        ):
+            if value:
+                out.append(f"- **{label}:** {value}")
+        out.append(f"- **Budget fit:** {idea.cost_fit}")
+        out.append(f"- **Source:** {idea.source.value}")
+        out.append("")
+    return out
 
-    # -- Provenance -------------------------------------------------------- #
-    out.append("---")
-    out.append("")
-    out.append(
+
+def _md_provenance(plan: Plan) -> list[str]:
+    """The closing note that separates computed numbers from written prose."""
+    if plan.ai_used:
+        ideas_note = "ideas were drafted by a language model and re-grounded against the budget."
+    else:
+        ideas_note = "ideas come from the curated catalogue."
+    return [
+        "---",
+        "",
         f"_Generated by Sutradhar on {plan.generated_at:%Y-%m-%d %H:%M} UTC. "
         "Budget, timeline, vendor and risk figures are computed deterministically; "
-        f"{'ideas were drafted by a language model and re-grounded against the budget.' if plan.ai_used else 'ideas come from the curated catalogue.'}_"
-    )
-    out.append("")
-    return "\n".join(out)
+        f"{ideas_note}_",
+        "",
+    ]
 
 
 # --------------------------------------------------------------------------- #

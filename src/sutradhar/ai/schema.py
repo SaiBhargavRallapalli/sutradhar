@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -95,62 +96,101 @@ def extract_json(text: str) -> Any:
         ) from exc
 
 
+_TRUE_WORDS = frozenset({"true", "yes", "y"})
+_FALSE_WORDS = frozenset({"false", "no", "n"})
+_FLOAT_RE = re.compile(r"-?\d+(?:\.\d+)?")
+_INT_RE = re.compile(r"-?\d+")
+
+
+def _coerce_str(value: Any, spec: FieldSpec) -> str | None:
+    """Coerce to text, scrubbing markup at the single model-output choke point."""
+    if isinstance(value, str):
+        return sanitize_model_text(value, max_chars=spec.max_len)
+    if isinstance(value, (int, float, bool)):
+        return sanitize_model_text(str(value), max_chars=spec.max_len)
+    return None
+
+
+def _coerce_float(value: Any, spec: FieldSpec) -> float | None:
+    """Coerce numbers and numeric strings (``"25%"`` -> ``25.0``)."""
+    if isinstance(value, bool):
+        return None  # bool is an int subclass; never silently treat it as a number.
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        match = _FLOAT_RE.search(value.replace(",", ""))
+        if match:
+            return float(match.group(0))
+    return None
+
+
+def _coerce_int(value: Any, spec: FieldSpec) -> int | None:
+    """Coerce integers and integer-ish strings (``"1,250"`` -> ``1250``)."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return round(value)
+    if isinstance(value, str):
+        match = _INT_RE.search(value.replace(",", ""))
+        if match:
+            return int(match.group(0))
+    return None
+
+
+def _coerce_bool(value: Any, spec: FieldSpec) -> bool | None:
+    """Coerce booleans and the common yes/no spellings."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        folded = value.strip().lower()
+        if folded in _TRUE_WORDS:
+            return True
+        if folded in _FALSE_WORDS:
+            return False
+    return None
+
+
+def _coerce_list(value: Any, spec: FieldSpec) -> list[str]:
+    """Coerce a list (or a lone scalar) to a bounded list of non-empty strings."""
+    items = value if isinstance(value, list) else [value]
+    cleaned: list[str] = []
+    for item in items[: spec.max_items]:
+        if isinstance(item, str):
+            text = item.strip()[: spec.max_len]
+        elif isinstance(item, (int, float)):
+            text = str(item)
+        else:
+            continue
+        if text:
+            cleaned.append(text)
+    return cleaned
+
+
+#: One converter per supported type. ``None`` means "does not fit this type",
+#: which lets the caller fall through to the next accepted type in ``spec.types``.
+_COERCERS: dict[str, Callable[[Any, FieldSpec], Any]] = {
+    "str": _coerce_str,
+    "float": _coerce_float,
+    "int": _coerce_int,
+    "bool": _coerce_bool,
+    "list[str]": _coerce_list,
+}
+
+
 def _coerce(value: Any, spec: FieldSpec) -> tuple[Any, str | None]:
     """Coerce ``value`` into one of ``spec.types``; return ``(value, error)``."""
     if value is None:
         return None, (None if not spec.required else f"{spec.name} is required")
 
     for wanted in spec.types:
-        if wanted == "str":
-            if isinstance(value, str):
-                # Sanitise here rather than trusting every caller to remember:
-                # this is the single choke point all model-produced strings pass
-                # through, so scrubbing markup and escapes once covers all of them.
-                out = sanitize_model_text(value, max_chars=spec.max_len)
-                return out, None
-            if isinstance(value, (int, float, bool)):
-                return sanitize_model_text(str(value), max_chars=spec.max_len), None
-        elif wanted == "float":
-            if isinstance(value, bool):
-                continue
-            if isinstance(value, (int, float)):
-                return float(value), None
-            if isinstance(value, str):
-                match = re.search(r"-?\d+(?:\.\d+)?", value.replace(",", ""))
-                if match:
-                    return float(match.group(0)), None
-        elif wanted == "int":
-            if isinstance(value, bool):
-                continue
-            if isinstance(value, int):
-                return value, None
-            if isinstance(value, float):
-                return round(value), None
-            if isinstance(value, str):
-                match = re.search(r"-?\d+", value.replace(",", ""))
-                if match:
-                    return int(match.group(0)), None
-        elif wanted == "bool":
-            if isinstance(value, bool):
-                return value, None
-            if isinstance(value, str):
-                if value.strip().lower() in {"true", "yes", "y"}:
-                    return True, None
-                if value.strip().lower() in {"false", "no", "n"}:
-                    return False, None
-        elif wanted == "list[str]":
-            items = value if isinstance(value, list) else [value]
-            cleaned: list[str] = []
-            for item in items[: spec.max_items]:
-                if isinstance(item, str):
-                    text = item.strip()[: spec.max_len]
-                elif isinstance(item, (int, float)):
-                    text = str(item)
-                else:
-                    continue
-                if text:
-                    cleaned.append(text)
-            return cleaned, None
+        converter = _COERCERS.get(wanted)
+        if converter is not None:
+            result = converter(value, spec)
+            # ``[]`` is a valid empty list, so compare against None explicitly.
+            if result is not None:
+                return result, None
 
     return None, f"{spec.name} should be {spec.type_label}; got {type(value).__name__}"
 

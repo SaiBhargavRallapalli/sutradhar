@@ -108,33 +108,39 @@ def _post_json(
                 if not isinstance(parsed, dict):
                     raise AIProviderError("the model endpoint returned a non-object response")
                 return cast(dict[str, Any], parsed)
-        except urllib.error.HTTPError as exc:
-            detail = _read_error(exc)
-            if exc.code in _RETRYABLE_STATUS and attempt < _MAX_ATTEMPTS - 1:
-                last_error = f"HTTP {exc.code}: {detail}"
-                _sleep_within(deadline, _BACKOFF_SECONDS * (2**attempt))
-                continue
-            raise AIProviderError(
-                redact(f"model request failed with HTTP {exc.code}: {detail}")
-            ) from exc
-        except urllib.error.URLError as exc:
-            last_error = f"network error: {exc.reason}"
-            if attempt < _MAX_ATTEMPTS - 1:
-                _sleep_within(deadline, _BACKOFF_SECONDS * (2**attempt))
-                continue
-            raise AIProviderError(
-                redact(f"could not reach the model endpoint: {exc.reason}")
-            ) from exc
-        except TimeoutError as exc:
-            last_error = "request timed out"
-            if attempt < _MAX_ATTEMPTS - 1:
-                _sleep_within(deadline, _BACKOFF_SECONDS * (2**attempt))
-                continue
-            raise AIProviderError("the model request timed out") from exc
-        except json.JSONDecodeError as exc:
-            raise AIProviderError("the model endpoint returned a non-JSON response") from exc
+        except (
+            urllib.error.HTTPError,
+            urllib.error.URLError,
+            TimeoutError,
+            json.JSONDecodeError,
+        ) as exc:
+            # Returns a message to retry with, or raises the terminal error.
+            last_error = _retry_message(exc, attempt)
+        _sleep_within(deadline, _BACKOFF_SECONDS * (2**attempt))
 
     raise AIProviderError(redact(f"model request failed: {last_error}"))
+
+
+def _retry_message(exc: Exception, attempt: int) -> str:
+    """Classify a transport error as retryable (return a message) or terminal (raise)."""
+    if isinstance(exc, urllib.error.HTTPError):
+        detail = _read_error(exc)
+        if exc.code in _RETRYABLE_STATUS and attempt < _MAX_ATTEMPTS - 1:
+            return f"HTTP {exc.code}: {detail}"
+        raise AIProviderError(
+            redact(f"model request failed with HTTP {exc.code}: {detail}")
+        ) from exc
+    if isinstance(exc, urllib.error.URLError):
+        if attempt < _MAX_ATTEMPTS - 1:
+            return f"network error: {exc.reason}"
+        raise AIProviderError(redact(f"could not reach the model endpoint: {exc.reason}")) from exc
+    if isinstance(exc, TimeoutError):
+        if attempt < _MAX_ATTEMPTS - 1:
+            return "request timed out"
+        raise AIProviderError("the model request timed out") from exc
+    if isinstance(exc, json.JSONDecodeError):
+        raise AIProviderError("the model endpoint returned a non-JSON response") from exc
+    raise AIProviderError(redact(f"model request failed: {exc}")) from exc
 
 
 def _sleep_within(deadline: float, delay: float) -> None:
